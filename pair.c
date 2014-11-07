@@ -36,7 +36,7 @@ int alloc_pair(pair* p, char* config)
     //path argtypes, arg1, arg2, ... argn : midicommand(arg1, arg3, 2*arg4);
     char path[200], argtypes[50], argnames[200], argname[100], midicommand[100], midiargs[200], work[50];
     char * tmp, *prev;
-    unsigned short i;
+    unsigned short i,j,n;
 
     p = (pair*)malloc(sizeof(pair));
 
@@ -61,17 +61,20 @@ int alloc_pair(pair* p, char* config)
      
     //decide if path has some arguments in it
     prev = path;
-    while(tmp = strchr(path,'<'))
+    j = 0;
+    while(tmp = strchr(prev,'<'))
     {
+        n = tmp - prev;
         prev = tmp;
-        i = tmp-path;
-        strncpy(p->path,path,i);
-        p->path[i] = 0;
+        strncpy(p->path+j,prev,n);
+        j += n;
+        p->path[j] = 0;
         strcat(p>path,"%i");
+        prev++ = strchr(prev,'>');
     }
     if(strchr(config,'<') && !p->path[0])
     {
-        printf("ERROR in config line: %s, could not get variable from OSC path use \'<i>\'!\n",config);
+        printf("ERROR in config line: %s, could not get variable from OSC path, use \'<i>\'!\n",config);
     }
 }
 
