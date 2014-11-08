@@ -10,13 +10,11 @@ typedef struct _pair
 {
 
     //osc data
-    char   path[200];
-    lo_arg** argv;//argument formats
+    char**   path;
+    lo_arg** argv;//arguments
     int argc;
-    
-    char**   informat;
-    char**   outformat;
     int argc_in_path;
+    char* types;
     
     //conversion factors
     float** coeff;
@@ -40,7 +38,12 @@ int alloc_pair(pair* p, char* config)
 
     p = (pair*)malloc(sizeof(pair));
 
-    i = sscanf(config,"%s %s,%s:%s(%s)",path,argtypes,argnames,argname,midicommand,midiargs);
+    //set defaults
+    p->argc_in_path = 0;
+    p->argc = 0;
+
+    //break config into separate parts
+    i = sscanf(config,"%s %[^,],%[^:]:%[^(](%[^)])",path,argtypes,argnames,argname,midicommand,midiargs);
     if(i==0)
         printf("ERROR in config line: %s, could not get OSC path!\n",config);
     else if(i==1)
@@ -59,27 +62,71 @@ int alloc_pair(pair* p, char* config)
         return -1;
     }
      
+
     //decide if path has some arguments in it
     prev = path;
     j = 0;
+    char var[100];
     while(tmp = strchr(prev,'<'))
     {
+        //get size of this part of path and allocate a string
         n = tmp - prev;
-        prev = tmp;
-        strncpy(p->path+j,prev,n);
-        j += n;
-        p->path[j] = 0;
-        strcat(p>path,"%i");
+        i = 0;
+        tmp = prev;
+        while(tmp = strchr(tmp,'%')) i++;
+        p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*n+i+3);
+        //double check the variable is good
+        i = sscanf(prev,"%*[^<]<%[^>]",var);
+        if(i < 1 || !strchr(var,'i'))
+        {
+            printf("ERROR in config line: %s, could not get variable from OSC path, use \'<i>\'!\n",config);
+            while(p->argc_in_path >=0)
+            {
+                free(p->path[p->argc_in_path--]);
+            }
+            free(p)
+            return -1;
+        }
+        //copy over path segment, delimit any % characters 
+        j=0;
+        for(i=0;i<n;i++)
+        {
+            if(prev[i] != '%')
+                p->path[p->argc_in_path][j++] = '%';
+            p->path[p->argc_in_path][j++] = prev[i];
+        }
+        p->path[p->argc_in_path][j] = 0;//null terminate to be safe
+        strcat(p->path[p->argc_in_path++],"%i")
         prev++ = strchr(prev,'>');
     }
-    if(strchr(config,'<') && !p->path[0])
+    //allocate space for end of path
+    p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*strlen(prev));
+    strcpy(p->path[p->argc_in_path],prev);
+
+
+    //now get the argument types
+    j = 0;
+    p->types = (char*)malloc(sizeof(char)*strlen(argtypes));
+    for(i=0;i<strlen(argtypes);i++)
     {
-        printf("ERROR in config line: %s, could not get variable from OSC path, use \'<i>\'!\n",config);
+        switch(argtypes[i])
+        {
+            case 'F':
+            case 'f':
+                //allocate an argument
+                p->types[j] = argtypes[i];
+
+
+            
+        }
     }
 }
 
-int free_pair(pair* p){
-
+int free_pair(pair* p)
+{
+    while(p->argc_in_path)
+        free(p->path[p->argc_in_path--]);
+    free(p->path[p->argc_in_path]);
     free(p);
 }
 
