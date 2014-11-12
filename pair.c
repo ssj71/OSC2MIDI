@@ -21,11 +21,14 @@ typedef struct _pair
     float* offset;
     
     //conversion factors
+    int* used;
     float** coeff;
     float** offset;
+    uint8_t glob_chan_flag;
+    uint8_t *glob_chan;
 
     //midi data
-    uint8_t midi[5];
+    //uint8_t midi[5];
     uint8_t opcode;
     uint8_t channel;
     uint8_t data1;
@@ -33,7 +36,7 @@ typedef struct _pair
 
 }pair;
 
-int alloc_pair(pair* p, char* config)
+int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
 {
     //path argtypes, arg1, arg2, ... argn : midicommand(arg1, arg3, 2*arg4);
     char path[200], argtypes[50], argnames[200], argname[100], midicommand[100], midiargs[200], work[50];
@@ -180,11 +183,14 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc)
             return 0;
         }
         
-        midi[p->map_in_path[i]] = (uint8_t)(p->scale_in_path[i]*v + p->offset_in_path);
+        midi[p->map_in_path[i]] += (uint8_t)(p->scale_in_path[i]*v + p->offset_in_path);
         //add arg flag if arg then get index
         
     }
 }
+
+
+
 int set_channel(pair* p, uint8_t channel);
 int try_match_midi(pair*, uint8_t msg[]);
 uint8_t* get_midi(pair* p);
