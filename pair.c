@@ -12,23 +12,19 @@ typedef struct _pair
     //osc data
     char**   path;
     int* perc;//point in path string with printf format %
-    lo_arg** argv;//arguments
-    lo_arg** argv_in_path;
     int argc;
     int argc_in_path;
     char* types;
-    float* scale;
-    float* offset;
     
     //conversion factors
-    int* used;
-    float** coeff;
-    float** offset;
-    uint8_t glob_chan_flag;
-    uint8_t *glob_chan;
+    int* map;//which byte in the midi message by index of var in OSC message (including in path args)
+    float scale[4];//scale factor for each argument going into the midi message
+    float offset[4];//linear offset for each arg going to midi message
+    uint8_t glob_chan_flag;//decides if using global channel (1) or if its specified by message (0)
+    uint8_t *glob_chan;//pointer to global channel
+    uint8_t raw_midi;//message sends osc datatype of midi message
 
     //midi data
-    //uint8_t midi[5];
     uint8_t opcode;
     uint8_t channel;
     uint8_t data1;
@@ -48,6 +44,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     //set defaults
     p->argc_in_path = 0;
     p->argc = 0;
+    p->raw_midi = 0;
 
     //break config into separate parts
     i = sscanf(config,"%s %[^,],%[^:]:%[^(](%[^)])",path,argtypes,argnames,argname,midicommand,midiargs);
@@ -93,7 +90,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
         i = sscanf(prev,"%*[^<]<%[^>]",var);
         if(i < 1 || !strchr(var,'i'))
         {
-            printf("ERROR in config line: %s, could not get variable from OSC path, use \'<i>\'!\n",config);
+            printf("ERROR in config line: %s, could not get variable in OSC path, use \'<i>\'!\n",config);
             while(p->argc_in_path >=0)
             {
                 free(p->path[p->argc_in_path--]);
@@ -132,6 +129,20 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
                 //allocate an argument
                 p->types[j] = argtypes[i];
 
+                case 'i':
+                case 'h'://long
+                case 's'://string
+                case 'b'://blob
+                case 'f':
+                case 'd':
+                case 'S'://symbol
+                case 't'://timetag
+                case 'c'://char
+                case 'm'://midi
+                case 'T'://true
+                case 'F'://false
+                case 'N'://nil
+                case 'I'://infinity
 
             
         }
@@ -166,7 +177,8 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc)
     //now start trying to get the data
     int i,v;
     char *tmp;
-    for(i=0;i<p->argc_in_path;i--)
+    uint8_t msg[3] = {0,0,0};
+    for(i=0;i<p->argc_in_path;i++)
     {
   
         //does it match?
@@ -182,10 +194,83 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc)
         {
             return 0;
         }
-        
-        midi[p->map_in_path[i]] += (uint8_t)(p->scale_in_path[i]*v + p->offset_in_path);
-        //add arg flag if arg then get index
-        
+        //put it in the message;
+        if(p->map[i] != -1)
+        {
+            msg[p->map[i]] += (uint8_t)(p->scale[i]*v + p->offset[i]); 
+        }
+    }
+    //compare the end of the path
+    if(!strstr(path,p->path[i]))
+    {
+        return 0;
+    }
+
+
+    //now the actual osc args
+    int j = 0;
+    double val;
+    for(i=0;i<p->argc;i++)
+    {
+        //put it in the message;
+        if(p->map[i+p->argc_in_path] != -1)
+        {
+            switch(types[i])
+            {
+                case 'i':
+                    val = (double)argv[j++]->i;
+                    break;
+                case 'h'://long
+                    val = (double)argv[j++]->h;
+                    break;
+                case 'f':
+                    val = (double)argv[j++]->f;
+                    break;
+                case 'd':
+                    val = (double)argv[j++]->d;
+                    break;
+                case 'c'://char
+                    val = (double)argv[j++]->c;
+                    break;
+                case 'T'://true
+                    val = 1.0;
+                    j++;
+                    break;
+                case 'F'://false
+                    val = 0.0;
+                    j++;
+                    break;
+                case 'N'://nil
+                    val = 0.0;
+                    j++;
+                    break;
+                case 'm'://midi
+                    //send full midi message and exit
+                    if(p->raw_midi)
+                    {
+                        send_midi(argv[j+1],argv[j+2],argv[j+3]);
+                        return 1;
+                    }
+
+                case 's'://string
+                case 'b'://blob
+                case 'S'://symbol
+                case 't'://timetag
+                case 'I'://infinity
+                default:
+                    //this isn't supported, they shouldn't use it as an arg
+                    return 0;
+
+            }
+            if(p->map[i+p->argc_in_path] == 3)//only used for note on or off
+            {
+                msg[0] += (uint8_t)(p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path])<<4;
+            }
+            else
+            {
+                msg[p->map[i+p->argc_in_path]] += (uint8_t)(p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path]); 
+            }
+        }
     }
 }
 
