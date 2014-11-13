@@ -1,0 +1,80 @@
+# spencer jackson
+# default.omm (Osc to Midi Map)
+
+# this is a highly configurable mapping from OSC messages to MIDI messages and
+# back. Each uncommented line follows the form:
+#        [OscPath] [ArgTypes], [ArgName1], [ArgName2], ..., [ArgNameN] : [MIDIFUNCTION](args);
+
+# more info is below the actual configuration specified in this file. This file 
+# is specifically for the default Control templates also included in this repo.
+
+
+/midi/cc{i} f, ctl, val   : controlchange( channel, ctl, val/127 );
+/midi/pc f, pgm           : programchange( channel, pgm );  
+/midi/pitch f, bend       : pitchbend( chanel, bend*8192 );
+/midi/noteon{i} i, n,vel  : noteon( channel, n, vel);
+/midi/noteoff{i} i, n,vel : noteon( channel, n, vel );
+/chan i,c                 : setchannel( c )
+
+
+
+
+
+# The first thing to note is that you can pass arguments through the OSC message
+# path. The sequence "{i}" indicates an integer in the path. This allows you to 
+# map many things quicky. For example rather than type out 127 mappings to include each
+# control number, you just pull the index of the controller out of the path. This
+# makes the first [ArgName] (i.e. "ctl" above) actually in the path rather than
+# lining up with the argument types listed after the path. Only integer types are 
+# supported in the path.
+
+# This could of course be accomplished through sending 2 arguments, but doing so
+# isn't as simple when designing a Control template. Both ways are fully supported.
+
+# The next thing to note is that "channel" is a keyword and shall not be used
+# as an OSC argument name. This keyword indicates that the global channel set in
+# osc2midi through the command line option -c <0-15> will be used in this 
+# part of the midi command. This again allows easy specification of the channel
+# but also great flexibility if one would not like every action to be on the 
+# global channel.
+
+# The global channel can be controlled through OSC by mapping an arbitrary
+# OSC path to execute the function setchannel() rather than one of the 
+# midi functions.
+
+# Naturally, the global channel doesn't have to be used at all. You could
+# specify the channel through an argument or the OSC path. i.e.
+#  /m/chan{i}/controlchange{i} i, chan,ctl,val : controlchange(chan,ctl,val);
+# or even
+#  /supercontroller d f h, ctl,value,grapefruit : controlchange(grapefruit,ctl,value);
+
+# So you see the ordering and naming of the variables is arbitrary. You can also
+# do some conditioning of the variables such as in the pitchbend and control
+# change examples in the mapping declared by this file. Only the */+- operators
+# are supported and only in the form of variable*/const +- const. You cannot
+# use arguments to condition other arguemnts, only constants.
+
+# The important formatting details for each mapping are that the path and argment
+# types are separated by a space, the first comma indicates the first argument 
+# name (naming the variable in the path or actual OSC argument), second comma 
+# for the next argument etc. The comma separates the OSC information from the midi
+# information. After the comma must have a valid function name with the correct
+# number of arguments. Each mapping must have its own line.
+
+# The full list of supported Midi Functions is as follows:
+#  noteon( channel, noteNumber, velocity );
+#  noteoff( channel, noteNumber, velocity );
+#  note( channel, noteNumber, velocity, state );  # state dictates note on (state != 0) or note off (state == 0)
+#  polyaftertouch( channel, noteNumber, pressure );
+#  controlchange( channel, controlNumber, value );
+#  programchange( channel, programNumber );
+#  aftertouch( channel, pressure );
+#  pitchbend( channel, value );
+#  rawmidi( byte0, byte1, byte2 );  # this sends whater midi message you compose with bytes 0-2
+#  midimessage( message );  # this sends a message using the OSC type m which is a pointer to a midi message
+
+# non-Midi functions that operate other system functions are:
+#  setchannel( channelNumber );  # set the global channel
+
+# If you make a mapping file that others could find useful please submit it and I
+# will include it with the source.
