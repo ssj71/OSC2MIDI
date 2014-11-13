@@ -52,7 +52,8 @@
 # do some conditioning of the variables such as in the pitchbend and control
 # change examples in the mapping declared by this file. Only the */+- operators
 # are supported and only in the form of variable*/const +- const. You cannot
-# use arguments to condition other arguemnts, only constants.
+# use arguments to condition other arguemnts, only constants. You can also simply
+# have a constant for an argument;
 
 # The important formatting details for each mapping are that the path and argment
 # types are separated by a space, the first comma indicates the first argument 

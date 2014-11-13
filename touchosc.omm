@@ -1,0 +1,16 @@
+# spencer jackson
+# touchosc.omm
+
+# this mapping is for the proprietary android/iOS app TouchOSC
+# since I don't actually own TouchOSC, I have no clue if this
+# is accurate or will work
+
+/ctl       iii, v,n,c : controlchange( c, n, v );
+/note      iii, n,v,c : noteon( c, n, v );
+/pgm       ii,  n,c   : programchange( c, n );
+/polytouch iii, v,n,c : polyaftertouch( c, n, v );
+/touch     ii,  v,c   : aftertouch( c, v );
+/bend      ii,  v,c   : pitchbend( c, v );
+/start ,              : rawmidi( 250, 0, 0 );
+/stop ,               : rawmidi( 251, 0, 0 ); 
+/cont ,               : rawmidi( 252, 0, 0 );
