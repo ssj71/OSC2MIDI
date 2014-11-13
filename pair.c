@@ -20,9 +20,10 @@ typedef struct _pair
     int* map;//which byte in the midi message by index of var in OSC message (including in path args)
     float scale[4];//scale factor for each argument going into the midi message
     float offset[4];//linear offset for each arg going to midi message
-    uint8_t glob_chan_flag;//decides if using global channel (1) or if its specified by message (0)
     uint8_t *glob_chan;//pointer to global channel
-    uint8_t raw_midi;//message sends osc datatype of midi message
+    uint8_t use_glob_chan;//flag decides if using global channel (1) or if its specified by message (0)
+    uint8_t set_channel;//flag if message is actually control message to change global channel
+    uint8_t raw_midi;//flag if message sends osc datatype of midi message
 
     //midi data
     uint8_t opcode;
@@ -160,8 +161,8 @@ int free_pair(pair* p)
     free(p);
 }
 
-//returns 1 if match is successful
-int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc)
+//returns 1 if match is successful and msg has a message to be sent to the output
+int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uint8_t msg)
 {
     //check the easy things first
     if(argc < p->argc)
@@ -174,10 +175,18 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc)
     }
 
 
+    //set defaults / static data
+    msg[0] = p->opcode + p->channel;
+    msg[1] = p->data1;
+    msg[2] = p->data2;
+    if(p->use_glob_chan)
+    {
+        msg[0] += *p->glob_chan;
+    }
+
     //now start trying to get the data
     int i,v;
     char *tmp;
-    uint8_t msg[3] = {0,0,0};
     for(i=0;i<p->argc_in_path;i++)
     {
   
@@ -234,21 +243,20 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc)
                     break;
                 case 'T'://true
                     val = 1.0;
-                    j++;
                     break;
                 case 'F'://false
                     val = 0.0;
-                    j++;
                     break;
                 case 'N'://nil
                     val = 0.0;
-                    j++;
                     break;
                 case 'm'://midi
                     //send full midi message and exit
                     if(p->raw_midi)
                     {
-                        send_midi(argv[j+1],argv[j+2],argv[j+3]);
+                        msg[0] = argv[j+1];
+                        msg[1] = argv[j+2];
+                        msg[2] = argv[j+3];
                         return 1;
                     }
 
@@ -258,13 +266,19 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc)
                 case 't'://timetag
                 case 'I'://infinity
                 default:
-                    //this isn't supported, they shouldn't use it as an arg
+                    //this isn't supported, they shouldn't use it as an arg, return error
                     return 0;
 
             }
+            //check if this is a message to set global channel
+            if(p->set_channel)
+            {
+                *p->glob_chan = (uint8_t)val;
+                return 0;//not an error but don't need to send a midi message
+            }   
             if(p->map[i+p->argc_in_path] == 3)//only used for note on or off
             {
-                msg[0] += (uint8_t)(p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path])<<4;
+                msg[0] += ((uint8_t)(p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path])>0)<<4;
             }
             else
             {
@@ -274,10 +288,5 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc)
     }
 }
 
-
-
-int set_channel(pair* p, uint8_t channel);
-int try_match_midi(pair*, uint8_t msg[]);
-uint8_t* get_midi(pair* p);
-lo_message get_osc(pair* p);
+int try_match_midi(pair*, uint8_t msg[], lo_message *osc);
 
