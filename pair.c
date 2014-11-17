@@ -17,7 +17,7 @@ typedef struct _pair
     char* types;
     
     //conversion factors
-    int* map;//which byte in the midi message by index of var in OSC message (including in path args)
+    int8_t* map;//which byte in the midi message by index of var in OSC message (including in path args)
     float scale[4];//scale factor for each argument going into the midi message
     float offset[4];//linear offset for each arg going to midi message
     uint8_t *glob_chan;//pointer to global channel
@@ -48,7 +48,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     p->raw_midi = 0;
 
     //break config into separate parts
-    i = sscanf(config,"%s %[^,],%[^:]:%[^(](%[^)])",path,argtypes,argnames,argname,midicommand,midiargs);
+    i = sscanf(config,"%s %[^,],%[^:]:%[^(](%[^)])",path,argtypes,argnames,midicommand,midiargs);
     if(i==0)
         printf("ERROR in config line: %s, could not get OSC path!\n",config);
     else if(i==1)
@@ -75,11 +75,11 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     //figure out how many chunks it will be broken up into
     tmp = path;
     i = 1;
-    while(tmp = strchr(tmp,'<'))i++;
+    while(tmp = strchr(tmp,'{'))i++;
     p->path = (char**)malloc(sizeof(char*)*i);
     p->perc = (int*)malloc(sizeof(int)*i);
     //now break it up into chunks
-    while(tmp = strchr(prev,'<'))
+    while(tmp = strchr(prev,'{'))
     {
         //get size of this part of path and allocate a string
         n = tmp - prev;
@@ -88,7 +88,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
         while(tmp = strchr(tmp,'%')) i++;
         p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*n+i+3);
         //double check the variable is good
-        i = sscanf(prev,"%*[^<]<%[^>]",var);
+        i = sscanf(prev,"%*[^{]<%[^}]",var);
         if(i < 1 || !strchr(var,'i'))
         {
             printf("ERROR in config line: %s, could not get variable in OSC path, use \'<i>\'!\n",config);
@@ -111,7 +111,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
         p->path[p->argc_in_path][j] = 0;//null terminate to be safe
         p->perc[p->argc_in_path] = j;//mark where the format percent sign is
         strcat(p->path[p->argc_in_path++],"%i")
-        prev++ = strchr(prev,'>');
+        prev++ = strchr(prev,'}');
     }
     //allocate space for end of path
     p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*strlen(prev));
@@ -120,34 +120,40 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
 
     //now get the argument types
     j = 0;
-    p->types = (char*)malloc(sizeof(char)*strlen(argtypes));
+    p->types = (char*)malloc( sizeof(char) * (strlen(argtypes)+1) );
+    p->map = (signed char*)malloc( sizeof(char) * (strlen(argtypes)+1) );
     for(i=0;i<strlen(argtypes);i++)
     {
         switch(argtypes[i])
         {
-            case 'F':
+            case 'i':
+            case 'h'://long
+            case 's'://string
+            case 'b'://blob
             case 'f':
-                //allocate an argument
-                p->types[j] = argtypes[i];
-
-                case 'i':
-                case 'h'://long
-                case 's'://string
-                case 'b'://blob
-                case 'f':
-                case 'd':
-                case 'S'://symbol
-                case 't'://timetag
-                case 'c'://char
-                case 'm'://midi
-                case 'T'://true
-                case 'F'://false
-                case 'N'://nil
-                case 'I'://infinity
-
-            
+            case 'd':
+            case 'S'://symbol
+            case 't'://timetag
+            case 'c'://char
+            case 'm'://midi
+            case 'T'://true
+            case 'F'://false
+            case 'N'://nil
+            case 'I'://infinity
+                p->map[j] = -1;//initialize mapping to be not used
+                p->types[j++] = argtypes[i];
+            case ' ':
+                break;
+            default:
+                printf("ERROR in config line: %s, argument type '%c' not supported!\n",config,argtypes[i]);
+                return -1;
+                break;
         }
     }
+    p->types[j] = 0;//null terminate. Its good practice
+
+
+    //next the midi command
 }
 
 int free_pair(pair* p)
@@ -169,7 +175,7 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
     {
        return 0;
     }
-    if(strncmp(types,p->types,strlen(p->types)))
+    if(strncmp(types,p->types,strlen(p->types)))//this won't work if it switches between T and F
     {
        return 0;
     }
@@ -250,6 +256,9 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
                 case 'N'://nil
                     val = 0.0;
                     break;
+                case 'I'://impulse
+                    val = 1.0;
+                    break;
                 case 'm'://midi
                     //send full midi message and exit
                     if(p->raw_midi)
@@ -264,7 +273,6 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
                 case 'b'://blob
                 case 'S'://symbol
                 case 't'://timetag
-                case 'I'://infinity
                 default:
                     //this isn't supported, they shouldn't use it as an arg, return error
                     return 0;
@@ -276,7 +284,7 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
                 *p->glob_chan = (uint8_t)val;
                 return 0;//not an error but don't need to send a midi message
             }   
-            if(p->map[i+p->argc_in_path] == 3)//only used for note on or off
+            if(p->map[i+p->argc_in_path] == 3)//only used for note on or off and filters
             {
                 msg[0] += ((uint8_t)(p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path])>0)<<4;
             }
