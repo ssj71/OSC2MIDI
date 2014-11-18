@@ -37,9 +37,11 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
 {
     //path argtypes, arg1, arg2, ... argn : midicommand(arg1, arg3, 2*arg4);
     char path[200], argtypes[50], argnames[200], argname[100], midicommand[100], midiargs[200],
-        arg0[50], arg1[50], arg2[50], arg3[50];
+        arg0[70], arg1[70], arg2[70], arg3[70], pre[50], var[50], post[50], work[50];
     char * tmp, *prev;
+    char *marg[4];
     unsigned short i,j,n;
+    float f;
 
     p = (pair*)malloc(sizeof(pair));
 
@@ -97,6 +99,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
             {
                 free(p->path[p->argc_in_path--]);
             }
+            free(p->perc);
             free(p->path);
             free(p)
             return -1;
@@ -143,14 +146,17 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
             case 'I'://infinity
                 p->map[j] = -1;//initialize mapping to be not used
                 p->types[j++] = argtypes[i];
+                p->argc++;
             case ' ':
                 break;
             default:
                 printf("ERROR in config line: %s, argument type '%c' not supported!\n",config,argtypes[i]);
+                p->argc_in_path += p->argc;
                 while(p->argc_in_path >=0)
                 {
                     free(p->path[p->argc_in_path--]);
                 }
+                free(p->perc);
                 free(p->types);
                 free(p->map);
                 free(p->path);
@@ -223,6 +229,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     {
         p->opcode = 0x00;
         n = 3;
+        p->rawmidi = 1;
     }
     else if(strstr(midicommand,"midimessage"))
     {
@@ -243,10 +250,12 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     else
     {
         printf("ERROR in config line: %s, midi command %s unknown!\n",config,midicommand);
+        p->argc_in_path += p->argc;
         while(p->argc_in_path >=0)
         {
             free(p->path[p->argc_in_path--]);
         }
+        free(p->perc);
         free(p->types);
         free(p->map);
         free(p->path);
@@ -264,6 +273,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
         {
             free(p->path[p->argc_in_path--]);
         }
+        free(p->perc);
         free(p->types);
         free(p->map);
         free(p->path);
@@ -272,7 +282,64 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     }
 
     //and the most difficult part: the mapping
-        
+    marg[0] = arg0;
+    marg[1] = arg1;
+    marg[2] = arg2;
+    marg[3] = arg3;
+    pre[0] = 0;
+    var[0] = 0;
+    post[0] = 0;
+    for(i=0;i<n;i++)//go through each argument
+    {
+        tmp = marg[i];
+        if( !(j = sscanf(tmp,"%[.1234567890*/+-]%[^*/+-]%[.1234567890*/+-]",pre,var,post)) )
+        {
+            j = sscanf(tmp,"%[^*/+-]%[.1234567890*/+-]",var,post);
+        }
+        if(!j)
+        {
+            printf("ERROR in config line: %s, could not understand arg %i in midi command\n",config,i);
+            p->argc_in_path += p->argc;
+            while(p->argc_in_path >=0)
+            {
+                free(p->path[p->argc_in_path--]);
+            }
+            free(p->types);
+            free(p->map);
+            free(p->path);
+            free(p)
+            return -1;
+        }
+        if (strlen(var)==0)
+        {
+            //must be a constant
+            if(!sscanf(pre,"%f",&f))
+            {
+                printf("ERROR in config line: %s, could not get constant arg %i in midi command\n",config,i);
+                p->argc_in_path += p->argc;
+                while(p->argc_in_path >=0)
+                {
+                    free(p->path[p->argc_in_path--]);
+                }
+                free(p->types);
+                free(p->map);
+                free(p->path);
+                free(p)
+                return -1;
+            }
+            p->scale[i] = 0;
+            p->offset[i] = f;
+        }
+        else
+        {
+            //find where it is in the OSC message
+            //get conditioning
+        }
+
+
+    }
+    
+
 }
 
 int free_pair(pair* p)
