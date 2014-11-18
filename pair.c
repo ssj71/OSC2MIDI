@@ -36,7 +36,8 @@ typedef struct _pair
 int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
 {
     //path argtypes, arg1, arg2, ... argn : midicommand(arg1, arg3, 2*arg4);
-    char path[200], argtypes[50], argnames[200], argname[100], midicommand[100], midiargs[200], work[50];
+    char path[200], argtypes[50], argnames[200], argname[100], midicommand[100], midiargs[200],
+        arg0[50], arg1[50], arg2[50], arg3[50];
     char * tmp, *prev;
     unsigned short i,j,n;
 
@@ -146,6 +147,14 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
                 break;
             default:
                 printf("ERROR in config line: %s, argument type '%c' not supported!\n",config,argtypes[i]);
+                while(p->argc_in_path >=0)
+                {
+                    free(p->path[p->argc_in_path--]);
+                }
+                free(p->types);
+                free(p->map);
+                free(p->path);
+                free(p)
                 return -1;
                 break;
         }
@@ -154,6 +163,116 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
 
 
     //next the midi command
+    /*
+      noteon( channel, noteNumber, velocity );
+      noteoff( channel, noteNumber, velocity );
+      note( channel, noteNumber, velocity, state );  # state dictates note on (state != 0) or note off (state == 0)
+      polyaftertouch( channel, noteNumber, pressure );
+      controlchange( channel, controlNumber, value );
+      programchange( channel, programNumber );
+      aftertouch( channel, pressure );
+      pitchbend( channel, value );
+      rawmidi( byte0, byte1, byte2 );  # this sends whater midi message you compose with bytes 0-2
+      midimessage( message );  # this sends a message using the OSC type m which is a pointer to a midi message
+
+         non-Midi functions that operate other system functions are:
+      setchannel( channelNumber );  # set the global channel
+      setshift( noteOffset ); # set the midi note filter shift amout
+  */
+    if(strstr(midicommand,"noteon"))
+    {
+        p->opcode = 0x90;
+        n = 3;
+    }
+    else if(strstr(midicommand,"noteoff"))
+    {
+        p->opcode = 0x80;
+        n = 3;
+    }
+    else if(strstr(midicommand,"note"))
+    {
+        p->opcode = 0x80;
+        n = 4;
+    }
+    else if(strstr(midicommand,"polyaftertouch"))
+    {
+        p->opcode = 0xA0;
+        n = 3;
+    }
+    else if(strstr(midicommand,"controlchange"))
+    {
+        p->opcode = 0xB0;
+        n = 3;
+    }
+    else if(strstr(midicommand,"programchange"))
+    {
+        p->opcode = 0xC0;
+        n = 2;
+    }
+    else if(strstr(midicommand,"aftertouch"))
+    {
+        p->opcode = 0xD0;
+        n = 2;
+    }
+    else if(strstr(midicommand,"pitchbend"))
+    {
+        p->opcode = 0xE0;
+        n = 2;
+    }
+    else if(strstr(midicommand,"rawmidi"))
+    {
+        p->opcode = 0x00;
+        n = 3;
+    }
+    else if(strstr(midicommand,"midimessage"))
+    {
+        p->opcode = 0x00;
+        n = 1;
+    }
+
+    else if(strstr(midicommand,"setchannel"))
+    {
+        p->opcode = 0x00;
+        n = 1;
+    }
+    else if(strstr(midicommand,"setshift"))
+    {
+        p->opcode = 0x00;
+        n = 1;
+    }
+    else
+    {
+        printf("ERROR in config line: %s, midi command %s unknown!\n",config,midicommand);
+        while(p->argc_in_path >=0)
+        {
+            free(p->path[p->argc_in_path--]);
+        }
+        free(p->types);
+        free(p->map);
+        free(p->path);
+        free(p)
+        return -1;
+    }
+
+    
+    //lets get those arguments
+    i = sscanf(midiargs,"%[^,],%[^,],%[^,],%[^,]",arg0,arg1,arg2,arg3);
+    if(n != i)
+    {
+        printf("ERROR in config line: %s, incorrect number of args in midi command!\n",config);
+        while(p->argc_in_path >=0)
+        {
+            free(p->path[p->argc_in_path--]);
+        }
+        free(p->types);
+        free(p->map);
+        free(p->path);
+        free(p)
+        return -1;
+    }
+
+    //and the most difficult part: the mapping
+        
 }
 
 int free_pair(pair* p)
