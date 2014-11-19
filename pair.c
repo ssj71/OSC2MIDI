@@ -33,6 +33,17 @@ typedef struct _pair
 
 }pair;
 
+void print_pair(pair* p)
+{
+    int i;
+
+    for(i=0;i<p->argc_in_path;i++)
+    {
+        printf("%s"
+    }
+        
+}
+
 int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
 {
     //path argtypes, arg1, arg2, ... argn : midicommand(arg1, arg3, 2*arg4);
