@@ -36,12 +36,12 @@ typedef struct _pair
 int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
 {
     //path argtypes, arg1, arg2, ... argn : midicommand(arg1, arg3, 2*arg4);
-    char path[200], argtypes[50], argnames[200], argname[100], midicommand[100], midiargs[200],
-        arg0[70], arg1[70], arg2[70], arg3[70], pre[50], var[50], post[50], work[50];
+    char path[200], argtypes[50], argnames[200], argname[100], midicommand[100], midiargs[200];
     char * tmp, *prev;
     char *marg[4];
     unsigned short i,j,n;
     float f;
+    uint8_t arg[4];
 
     p = (pair*)malloc(sizeof(pair));
 
@@ -49,6 +49,10 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     p->argc_in_path = 0;
     p->argc = 0;
     p->raw_midi = 0;
+    p->opcode = 0;
+    p->channel = 0;
+    p->data1 = 0;
+    p->data2 = 0;
 
     //break config into separate parts
     i = sscanf(config,"%s %[^,],%[^:]:%[^(](%[^)])",path,argtypes,argnames,midicommand,midiargs);
@@ -236,7 +240,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
         p->opcode = 0x00;
         n = 1;
     }
-
+    //non-midi commands
     else if(strstr(midicommand,"setchannel"))
     {
         p->opcode = 0x00;
@@ -264,6 +268,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     }
 
     
+    char arg0[70], arg1[70], arg2[70], arg3[70], pre[50], var[50], post[50], work[50];
     //lets get those arguments
     i = sscanf(midiargs,"%[^,],%[^,],%[^,],%[^,]",arg0,arg1,arg2,arg3);
     if(n != i)
@@ -292,7 +297,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     for(i=0;i<n;i++)//go through each argument
     {
         tmp = marg[i];
-        if( !(j = sscanf(tmp,"%[.1234567890*/+-]%[^*/+-]%[.1234567890*/+-]",pre,var,post)) )
+        if( !(j = sscanf(tmp,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,var,post)) )
         {
             j = sscanf(tmp,"%[^*/+-]%[.1234567890*/+-]",var,post);
         }
@@ -328,16 +333,31 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
                 return -1;
             }
             p->scale[i] = 0;
-            p->offset[i] = f;
+            p->offset[i] = 0;
+            arg[i] = (uint8_t)f;
         }
-        else
+        else//not a constant
         {
-            //find where it is in the OSC message
-            //get conditioning
-        }
+            //check if its the global channel keyword
+            if(!strncmp(var,"channel",7))
+            {
+                p->use_glob_chan = 1;
+                p->scale[i] = 0;
+                p->offset[i] = 0;
+                arg[i] = 0;
+            }
+            else
+            {
+                //find where it is in the OSC message
+                for(j=0;j<p->argc_in_path+p->argc;j++)
+                {
+                }
+                //get conditioning
+            }
 
 
-    }
+        }//not constant
+    }//for each arg
     
 
 }
@@ -470,7 +490,7 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
                 *p->glob_chan = (uint8_t)val;
                 return 0;//not an error but don't need to send a midi message
             }   
-            if(p->map[i+p->argc_in_path] == 3)//only used for note on or off and filters
+            if(p->map[i+p->argc_in_path] == 3)//only used for note on or off
             {
                 msg[0] += ((uint8_t)(p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path])>0)<<4;
             }
@@ -478,8 +498,8 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
             {
                 msg[p->map[i+p->argc_in_path]] += (uint8_t)(p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path]); 
             }
-        }
-    }
+        }//if arg is used
+    }//for args
 }
 
 int try_match_midi(pair*, uint8_t msg[], lo_message *osc);
