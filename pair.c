@@ -87,11 +87,24 @@ void print_pair(pair* p)
     printf(")\n");
 }
 
+void rm_whitespace(char* str)
+{
+    int i,j;
+    int n = strlen(str);
+    for(i=j=0;j<n;i++)//remove whitespace
+    {
+        while(str[j] == ' ' || str[j] == '\t')
+        {
+            j++;
+        }
+        str[i] = str[j++];
+    }
+}
 int get_pair_path(char* path, pair* p)
 {
     //decide if path has some arguments in it
-    prev = path;
-    j = 0;
+    char* tmp,*prev = path;
+    int n,i,j = 0;
     char var[100];
     //figure out how many chunks it will be broken up into
     tmp = path;
@@ -128,7 +141,7 @@ int get_pair_path(char* path, pair* p)
         strcat(p->path[p->argc_in_path++],"%i")
         prev++ = strchr(prev,'}');
     }
-    //allocate space for end of path
+    //allocate space for end of path and copy
     p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*strlen(prev));
     strcpy(p->path[p->argc_in_path],prev);
 }
@@ -136,7 +149,7 @@ int get_pair_path(char* path, pair* p)
 int get_path_argtypes(char* argtypes, pair* p)
 {
     //now get the argument types
-    j = 0;
+    int i,j = 0;
     p->types = (char*)malloc( sizeof(char) * (strlen(argtypes)+1) );
     p->map = (signed char*)malloc( sizeof(char) * (strlen(argtypes)+1) );
     for(i=0;i<strlen(argtypes);i++)
@@ -418,18 +431,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
             else
             {
                 //find where it is in the OSC message
-                n = strlen(argnames);
-                for(j=0;j<n;j++)//remove whitespace
-                {
-                    if(argnames[j] == ' ' || argnames[j] == '\t')
-                    {
-                        for(k=j;k<n;k++)
-                        {
-                            argnames[k] = argnames[k+1];
-                        }
-                        n--;
-                    }
-                }
+                rm_whitespace(argnames);
                 n = strlen(var);//verify n and tmp aren't used in this scope!
                 tmp = argnames;
                 for(j=0;j<p->argc_in_path+p->argc;j++)
