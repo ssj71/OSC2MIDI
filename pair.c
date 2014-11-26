@@ -87,48 +87,8 @@ void print_pair(pair* p)
     printf(")\n");
 }
 
-int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
+int get_pair_path(char* path, pair* p)
 {
-    //path argtypes, arg1, arg2, ... argn : midicommand(arg1+4, arg3, 2*arg4);
-    char path[200], argtypes[50], argnames[200], midicommand[100], midiargs[200];
-    char * tmp, *prev;
-    char *marg[4];
-    unsigned short i,j,n;
-    float f;
-    uint8_t arg[4];
-
-    p = (pair*)malloc(sizeof(pair));
-
-    //set defaults
-    p->argc_in_path = 0;
-    p->argc = 0;
-    p->raw_midi = 0;
-    p->opcode = 0;
-    p->channel = 0;
-    p->data1 = 0;
-    p->data2 = 0;
-
-    //break config into separate parts
-    i = sscanf(config,"%s %[^,],%[^:]:%[^(](%[^)])",path,argtypes,argnames,midicommand,midiargs);
-    if(i==0)
-        printf("ERROR in config line: %s, could not get OSC path!\n",config);
-    else if(i==1)
-        printf("ERROR in config line: %s, could not get OSC types!\n",config);
-    else if(i==2)
-        printf("ERROR in config line: %s, could not get OSC variable names!\n",config);
-    else if(i==3)
-        printf("ERROR in config line: %s, could not get MIDI command type!\n",config);
-    else if(i==4)
-        printf("ERROR in config line: %s, could not get MIDI command arguments!\n",config);
-    if(i<5)
-    {
-        //abort this pair
-        free(p);
-        p=0;
-        return -1;
-    }
-     
-
     //decide if path has some arguments in it
     prev = path;
     j = 0;
@@ -153,13 +113,6 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
         if(i < 1 || !strchr(var,'i'))
         {
             printf("ERROR in config line: %s, could not get variable in OSC path, use \'<i>\'!\n",config);
-            while(p->argc_in_path >=0)
-            {
-                free(p->path[p->argc_in_path--]);
-            }
-            free(p->perc);
-            free(p->path);
-            free(p)
             return -1;
         }
         //copy over path segment, delimit any % characters 
@@ -178,8 +131,10 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     //allocate space for end of path
     p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*strlen(prev));
     strcpy(p->path[p->argc_in_path],prev);
+}
 
-
+int get_path_argtypes(char* argtypes, pair* p)
+{
     //now get the argument types
     j = 0;
     p->types = (char*)malloc( sizeof(char) * (strlen(argtypes)+1) );
@@ -209,23 +164,17 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
                 break;
             default:
                 printf("ERROR in config line: %s, argument type '%c' not supported!\n",config,argtypes[i]);
-                p->argc_in_path += p->argc;
-                while(p->argc_in_path >=0)
-                {
-                    free(p->path[p->argc_in_path--]);
-                }
-                free(p->perc);
-                free(p->types);
-                free(p->map);
-                free(p->path);
-                free(p)
                 return -1;
                 break;
         }
     }
     p->types[j] = 0;//null terminate. Its good practice
+}
 
+int get_pair_midicommand(char* midicommand, path* p)
+{
 
+    int n;
     //next the midi command
     /*
       noteon( channel, noteNumber, velocity );
@@ -309,18 +258,83 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     else
     {
         printf("ERROR in config line: %s, midi command %s unknown!\n",config,midicommand);
-        p->argc_in_path += p->argc;
-        while(p->argc_in_path >=0)
-        {
-            free(p->path[p->argc_in_path--]);
-        }
-        free(p->perc);
-        free(p->types);
-        free(p->map);
-        free(p->path);
-        free(p)
         return -1;
     }
+    return n;
+}
+
+int abort_pair_alloc(int step)
+{
+    switch(step)
+    {
+        case 3:
+            //p->argc_in_path += p->argc;
+            free(p->types);
+            free(p->map);
+        case 2:
+            while(p->argc_in_path >=0)
+            {
+                free(p->path[p->argc_in_path--]);
+            }
+            free(p->perc)
+            free(p->path);
+        case 1:
+            free(p);
+        default:
+            break;
+    }
+    return -1;
+}
+
+int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
+{
+    //path argtypes, arg1, arg2, ... argn : midicommand(arg1+4, arg3, 2*arg4);
+    char path[200], argtypes[50], argnames[200], midicommand[100], midiargs[200];
+    char * tmp, *prev;
+    char *marg[4];
+    unsigned short i,j,n;
+    float f;
+    uint8_t arg[4];
+
+    p = (pair*)malloc(sizeof(pair));
+
+    //set defaults
+    p->argc_in_path = 0;
+    p->argc = 0;
+    p->raw_midi = 0;
+    p->opcode = 0;
+    p->channel = 0;
+    p->data1 = 0;
+    p->data2 = 0;
+
+    //break config into separate parts
+    i = sscanf(config,"%s %[^,],%[^:]:%[^(](%[^)])",path,argtypes,argnames,midicommand,midiargs);
+    if(i==0)
+        printf("ERROR in config line: %s, could not get OSC path!\n",config);
+    else if(i==1)
+        printf("ERROR in config line: %s, could not get OSC types!\n",config);
+    else if(i==2)
+        printf("ERROR in config line: %s, could not get OSC variable names!\n",config);
+    else if(i==3)
+        printf("ERROR in config line: %s, could not get MIDI command type!\n",config);
+    else if(i==4)
+        printf("ERROR in config line: %s, could not get MIDI command arguments!\n",config);
+    if(i<5)
+    {
+        return abort_pair_alloc(1);
+    }
+     
+    if(-1 == get_pair_path(path,p))
+        return abort_pair_alloc(2);
+
+
+    if(-1 == get_pair_argtypes(argtypes,p))
+        return abort_pair_alloc(3);
+
+
+    n = get_pair_midicommand(midicommand,p);
+    if(-1 == n)
+        return abort_pair_alloc(3);
 
     
     char arg0[70], arg1[70], arg2[70], arg3[70], pre[50], var[50], post[50], work[50];
