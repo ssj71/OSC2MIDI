@@ -37,17 +37,60 @@ void print_pair(pair* p)
 {
     int i;
 
+    //path
     for(i=0;i<p->argc_in_path;i++)
     {
-        printf("%s"
+        printf("%s",p->path[i]);
     }
-        
+    
+    //types
+    printf(" %s, ",p->types);
+    
+    //arg names
+    for(i=0;i<p->argc_in_path;i++)
+    {
+        printf("%c, ",'a'+i);
+    }
+    for(;i<p->argc+p->argc_in_path;i++)
+    {
+        printf("%c, ",'a'+i);
+    }
+    
+    //command global channel
+    printf(": rawmidi(");
+    if(p->use_glob_chan)
+        printf(" glob_chan +");
+
+    //midi arg 0
+    printf(" %i + %i + ",p->opcode,p->channel);
+    for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=0;i++);
+    if(i<p->argc+p->argc_in_path)
+        printf("%.2f*%c + %.2f",p->scale[0],'a'+i,p->offset[0]);
+    
+    //midi arg3 (only for note on/off)
+    for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=3;i++);
+    if(i<p->argc+p->argc_in_path)
+        printf(" + %.2f*%c + %.2f",p->scale[3],'a'+i,p->offset[3]);
+    
+    //midi arg1
+    printf(", %i + ",p->data1);
+    for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=1;i++);
+    if(i<p->argc+p->argc_in_path)
+        printf("%.2f*%c + %.2f",p->scale[1],'a'+i,p->offset[1]);
+    
+    //midi arg2
+    printf(", %i + ",p->data2);
+    for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=2;i++);
+    if(i<p->argc+p->argc_in_path)
+        printf("%.2f*%c + %.2f",p->scale[2],'a'+i,p->offset[2]);
+
+    printf(")\n");
 }
 
 int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
 {
-    //path argtypes, arg1, arg2, ... argn : midicommand(arg1, arg3, 2*arg4);
-    char path[200], argtypes[50], argnames[200], argname[100], midicommand[100], midiargs[200];
+    //path argtypes, arg1, arg2, ... argn : midicommand(arg1+4, arg3, 2*arg4);
+    char path[200], argtypes[50], argnames[200], midicommand[100], midiargs[200];
     char * tmp, *prev;
     char *marg[4];
     unsigned short i,j,n;
@@ -256,6 +299,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     {
         p->opcode = 0x00;
         n = 1;
+        p->set_channel = 1;
     }
     else if(strstr(midicommand,"setshift"))
     {
@@ -360,8 +404,26 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
             else
             {
                 //find where it is in the OSC message
+                n = strlen(argnames);
+                for(j=0;j<n;j++)//remove whitespace
+                {
+                    if(argnames[j] == ' ' || argnames[j] == '\t')
+                    {
+                        for(k=j;k<n;k++)
+                        {
+                            argnames[k] = argnames[k+1];
+                        }
+                        n--;
+                    }
+                }
+                n = strlen(var);//verify n and tmp aren't used in this scope!
+                tmp = argnames;
                 for(j=0;j<p->argc_in_path+p->argc;j++)
                 {
+                    if(!strncmp(var,tmp,n))
+                    {
+                        
+                    }
                 }
                 //get conditioning
             }
