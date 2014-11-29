@@ -305,7 +305,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     char path[200], argtypes[50], argnames[200], midicommand[100], midiargs[200];
     char * tmp, *prev;
     char *marg[4];
-    unsigned short i,j,n;
+    unsigned short i,j,k,n;
     float f;
     uint8_t arg[4];
 
@@ -352,6 +352,7 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     
     char arg0[70], arg1[70], arg2[70], arg3[70], pre[50], var[50], post[50], work[50];
     //lets get those arguments
+    rm_whitespace(argnames);
     i = sscanf(midiargs,"%[^,],%[^,],%[^,],%[^,]",arg0,arg1,arg2,arg3);
     if(n != i)
     {
@@ -431,20 +432,44 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
             else
             {
                 //find where it is in the OSC message
-                rm_whitespace(argnames);
-                n = strlen(var);//verify n and tmp aren't used in this scope!
+                k = strlen(var);
                 tmp = argnames;
-                for(j=0;j<p->argc_in_path+p->argc;j++)
+                for(j=0;(j<p->argc_in_path+p->argc) && tmp;j++)
                 {
-                    if(!strncmp(var,tmp,n))
+                    if(!strncmp(var,tmp,k))
                     {
-                        
+                        //match
+                        p->map[j] = i;                    
+                    }
+                    else
+                    {
+                        //next arg name
+                        tmp = strchr(tmp,',');
                     }
                 }
-                //get conditioning
+                //get conditioning, should be pre=b+a* and/or post=*a+b
+                if(strlen(post))
+                {
+                    char s1[4],s2[4];
+                    float a,b;
+                    switch(sscanf(post,"%f%[-+* ]%f%[+-* ]",&b,s1,&a,s2))
+                    {
+                        case 4:
+                            if(strchr(s2,'*'))//only multiply makes sense here
+                            {
+                                p->scale[i] = a;
+                            }
+                            else
+                            {
+                                //error. abort
+                            }
+                    }
+                }
+                if(strlen(pre))
+                {
+                    
+                }
             }
-
-
         }//not constant
     }//for each arg
     
