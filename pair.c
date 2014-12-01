@@ -379,6 +379,9 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     post[0] = 0;
     for(i=0;i<n;i++)//go through each argument
     {
+        p->scale[i] = 0;
+        p->offset[i] = 0;
+
         tmp = marg[i];
         if( !(j = sscanf(tmp,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,var,post)) )
         {
@@ -415,8 +418,6 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
                 free(p)
                 return -1;
             }
-            p->scale[i] = 0;
-            p->offset[i] = 0;
             arg[i] = (uint8_t)f;
         }
         else//not a constant
@@ -462,6 +463,16 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
                             else
                             {
                                 //error. abort
+                            }
+                        case 2:
+                            if(strchr(s1,'*'))
+                            {
+                            }
+                            else if(strchr(s1,'+'))
+                            {
+                            }
+                            else if(strchr(s1,'-'))
+                            {
                             }
                     }
                 }
