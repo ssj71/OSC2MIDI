@@ -4,9 +4,13 @@
 //This should be sufficient to take a config file (.omm) line and have everything
 //necessary to generate a midi message from the OSC and visa versa.
 
-#include<pair.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include"pair.h"
 
-typedef struct _pair
+
+typedef struct _PAIR
 {
 
     //osc data
@@ -31,11 +35,12 @@ typedef struct _pair
     uint8_t data1;
     uint8_t data2;
 
-}pair;
+}PAIR;
 
-void print_pair(pair* p)
+void print_pair(PAIRHANDLE* ph)
 {
     int i;
+    PAIR* p = (PAIR*)ph;
 
     //path
     for(i=0;i<p->argc_in_path;i++)
@@ -101,7 +106,7 @@ void rm_whitespace(char* str)
     }
 }
 
-int get_pair_path(char* config, pair* p)
+int get_pair_path(char* config, PAIR* p)
 {
     char path[200];
     char* tmp,*prev;
@@ -147,15 +152,15 @@ int get_pair_path(char* config, pair* p)
         }
         p->path[p->argc_in_path][j] = 0;//null terminate to be safe
         p->perc[p->argc_in_path] = j;//mark where the format percent sign is
-        strcat(p->path[p->argc_in_path++],"%i")
-        prev++ = strchr(prev,'}');
+        strcat(p->path[p->argc_in_path++],"%i");
+        prev = strchr(prev++,'}');
     }
     //allocate space for end of path and copy
     p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*strlen(prev));
     strcpy(p->path[p->argc_in_path],prev);
 }
 
-int get_pair_argtypes(char* config, pair* p)
+int get_pair_argtypes(char* config, PAIR* p)
 {
     char argtypes[100];
     int i,j = 0;
@@ -200,7 +205,7 @@ int get_pair_argtypes(char* config, pair* p)
     p->types[j] = 0;//null terminate. Its good practice
 }
 
-int get_pair_midicommand(char* config, path* p)
+int get_pair_midicommand(char* config, PAIR* p)
 {
     char midicommand[100];
     int n;
@@ -271,7 +276,7 @@ int get_pair_midicommand(char* config, path* p)
     {
         p->opcode = 0x00;
         n = 3;
-        p->rawmidi = 1;
+        p->raw_midi = 1;
     }
     else if(strstr(midicommand,"midimessage"))
     {
@@ -299,18 +304,18 @@ int get_pair_midicommand(char* config, path* p)
 }
 
 
-int get_pair_mapping(char* config, pair* p, int n)
+int get_pair_mapping(char* config, PAIR* p, int n)
 {
     char argnames[200],midiargs[200],
         arg0[70], arg1[70], arg2[70], arg3[70],
         pre[50], var[50], post[50], work[50];
-    char *tmp, margs[4];
-    float arg[4] = {0,0,0,0};
+    char *tmp, *marg[4];
+    float f,arg[4] = {0,0,0,0};
     int i,j,k;
 
     if(2 < sscanf(config,"%*s %*[^,],%[^:]:%*[^(](%[^)])",argnames,midiargs))
     {
-        if(!sscanf(config,"%*s %*[^,],%[*^:]:%*[^(](%[^)])",midiargs))
+        if(!sscanf(config,"%*s %*[^,],%*[^:]:%*[^(](%[^)])",midiargs))
         {
             printf("ERROR in config line: %s, could not get MIDI command arguments!\n",config);
             return -1;
@@ -348,15 +353,6 @@ int get_pair_mapping(char* config, pair* p, int n)
         if(!j)
         {
             printf("ERROR in config line: %s, could not understand arg %i in midi command\n",config,i);
-            p->argc_in_path += p->argc;
-            while(p->argc_in_path >=0)
-            {
-                free(p->path[p->argc_in_path--]);
-            }
-            free(p->types);
-            free(p->map);
-            free(p->path);
-            free(p)
             return -1;
         }
         if (strlen(var)==0)
@@ -411,7 +407,7 @@ int get_pair_mapping(char* config, pair* p, int n)
                             }
                             else
                             {
-                                printf("ERROR in config line: %s, incorrect number of args in midi command!\n",config);
+                                printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
                                 return -1;
                             }
                         case 2:
@@ -436,7 +432,8 @@ int get_pair_mapping(char* config, pair* p, int n)
                             }
                             else
                             {
-                                //error abort
+                                printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
+                                return -1; 
                             }
                     }//switch
                 }//if pre conditions
@@ -457,7 +454,8 @@ int get_pair_mapping(char* config, pair* p, int n)
                             }
                             else
                             {
-                                //error
+                                printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
+                                return -1; 
                             }
                         case 2:
                             if(strchr(s1,'*'))
@@ -478,7 +476,8 @@ int get_pair_mapping(char* config, pair* p, int n)
                             }
                             break;
                         default:
-                            //error abort
+                            printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
+                            return -1; 
                     }//switch
                     
                 }//if post conditioning
@@ -491,7 +490,7 @@ int get_pair_mapping(char* config, pair* p, int n)
     p->opcode += arg[3];
 }
 
-int abort_pair_alloc(int step)
+int abort_pair_alloc(int step, PAIR* p)
 {
     switch(step)
     {
@@ -503,7 +502,7 @@ int abort_pair_alloc(int step)
             {
                 free(p->path[p->argc_in_path--]);
             }
-            free(p->perc)
+            free(p->perc);
             free(p->path);
         case 1:
             free(p);
@@ -513,17 +512,13 @@ int abort_pair_alloc(int step)
     return -1;
 }
 
-int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
+int alloc_pair(PAIRHANDLE ph, char* config, uint8_t *glob_chan)
 {
     //path argtypes, arg1, arg2, ... argn : midicommand(arg1+4, arg3, 2*arg4);
-    char path[200], argtypes[50], argnames[200], midicommand[100], midiargs[200];
-    char * tmp, *prev;
-    char *marg[4];
-    unsigned short i,j,k,n;
-    float f;
-    uint8_t arg[4];
+    PAIR* p = (PAIR*)ph;
+    int n;
 
-    p = (pair*)malloc(sizeof(pair));
+    p = (PAIR*)malloc(sizeof(PAIR));
 
     //set defaults
     p->argc_in_path = 0;
@@ -534,53 +529,41 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     p->data1 = 0;
     p->data2 = 0;
 
-    //break config into separate parts
-    i = sscanf(config,"%s %[^,],%[^:]:%[^(](%[^)])",path,argtypes,argnames,midicommand,midiargs);
-    if(i==0)
-        printf("ERROR in config line: %s, could not get OSC path!\n",config);
-    else if(i==1)
-        printf("ERROR in config line: %s, could not get OSC types!\n",config);
-    else if(i==2)
-        printf("ERROR in config line: %s, could not get OSC variable names!\n",config);
-    else if(i==3)
-        printf("ERROR in config line: %s, could not get MIDI command type!\n",config);
-    else if(i==4)
-        printf("ERROR in config line: %s, could not get MIDI command arguments!\n",config);
-    if(i<5)
-    {
-        return abort_pair_alloc(1);
-    }
-     
-    if(-1 == get_pair_path(path,p))
-        return abort_pair_alloc(2);
+    //config into separate parts
+    if(-1 == get_pair_path(config,p))
+        return abort_pair_alloc(2,p);
 
 
-    if(-1 == get_pair_argtypes(argtypes,p))
-        return abort_pair_alloc(3);
+    if(-1 == get_pair_argtypes(config,p))
+        return abort_pair_alloc(3,p);
 
 
-    n = get_pair_midicommand(midicommand,p);
+    n = get_pair_midicommand(config,p);
     if(-1 == n)
-        return abort_pair_alloc(3);
+        return abort_pair_alloc(3,p);
 
     if(-1 == get_pair_mapping(config,p,n))
-        return abort_pair_alloc(3);
+        return abort_pair_alloc(3,p);
 }
 
-int free_pair(pair* p)
+int free_pair(PAIRHANDLE ph)
 {
-    while(p->argc_in_path>=0)
+    PAIR* p = (PAIR*)ph;
+    free(p->types);
+    free(p->map);
+    while(p->argc_in_path >=0)
+    {
         free(p->path[p->argc_in_path--]);
-    free(p->path);
+    }
     free(p->perc);
-    free(p->arg_in_path);
-    free(p->argv);
+    free(p->path);
     free(p);
 }
 
 //returns 1 if match is successful and msg has a message to be sent to the output
-int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uint8_t msg)
+int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int argc, uint8_t msg[])
 {
+    PAIR* p = (PAIR*)ph;
     //check the easy things first
     if(argc < p->argc)
     {
@@ -608,9 +591,9 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
     {
   
         //does it match?
-        p->path[p->perc[i]] = 0;
+        p->path[i][p->perc[i]] = 0;
         tmp = strstr(path,p->path[i]);  
-        p->path[p->perc[i]] = '%';
+        p->path[i][p->perc[i]] = '%';
         if(!tmp)
         {
             return 0;
@@ -626,7 +609,7 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
             msg[p->map[i]] += (uint8_t)(p->scale[i]*v + p->offset[i]); 
             if(p->opcode == 0xE0 && p->map[i] == 1)//pitchbend is special case (14 bit number)
             {
-                msg[p->map[i]+1] += (uint8_t)((p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path])/128.0); 
+                msg[p->map[i]+1] += (uint8_t)((p->scale[i+p->argc_in_path]*v + p->offset[i+p->argc_in_path])/128.0); 
             }
         }
     }
@@ -678,9 +661,9 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
                     //send full midi message and exit
                     if(p->raw_midi)
                     {
-                        msg[0] = argv[j+1];
-                        msg[1] = argv[j+2];
-                        msg[2] = argv[j+3];
+                        msg[0] = argv[j+1]->i;
+                        msg[1] = argv[j+2]->i;
+                        msg[2] = argv[j+3]->i;
                         return 1;
                     }
 
@@ -715,5 +698,5 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
     }//for args
 }
 
-int try_match_midi(pair*, uint8_t msg[], lo_message *osc){}
+int try_match_midi(PAIRHANDLE ph, uint8_t msg[], lo_message *osc){}
 
