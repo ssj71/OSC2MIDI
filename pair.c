@@ -100,13 +100,22 @@ void rm_whitespace(char* str)
         str[i] = str[j++];
     }
 }
-int get_pair_path(char* path, pair* p)
+
+int get_pair_path(char* config, pair* p)
 {
-    //decide if path has some arguments in it
-    char* tmp,*prev = path;
+    char path[200];
+    char* tmp,*prev;
     int n,i,j = 0;
     char var[100];
+    if(!sscanf(config,"%s %*[^,],%*[^:]:%*[^(](%*[^)])",path))
+    {
+        printf("ERROR in config line: %s, could not get OSC path!\n",config);
+        return -1;
+    }
+
+    //decide if path has some arguments in it
     //figure out how many chunks it will be broken up into
+    prev = path;
     tmp = path;
     i = 1;
     while(tmp = strchr(tmp,'{'))i++;
@@ -146,10 +155,17 @@ int get_pair_path(char* path, pair* p)
     strcpy(p->path[p->argc_in_path],prev);
 }
 
-int get_path_argtypes(char* argtypes, pair* p)
+int get_pair_argtypes(char* config, pair* p)
 {
-    //now get the argument types
+    char argtypes[100];
     int i,j = 0;
+    if(!sscanf(config,"%*s %[^,],%*[^:]:%*[^(](%*[^)])",argtypes))
+    {
+        printf("ERROR in config line: %s, could not get OSC data types!\n",config);
+        return -1;
+    }
+
+    //now get the argument types
     p->types = (char*)malloc( sizeof(char) * (strlen(argtypes)+1) );
     p->map = (signed char*)malloc( sizeof(char) * (strlen(argtypes)+1) );
     for(i=0;i<strlen(argtypes);i++)
@@ -184,10 +200,16 @@ int get_path_argtypes(char* argtypes, pair* p)
     p->types[j] = 0;//null terminate. Its good practice
 }
 
-int get_pair_midicommand(char* midicommand, path* p)
+int get_pair_midicommand(char* config, path* p)
 {
-
+    char midicommand[100];
     int n;
+    if(!sscanf(config,"%*s %*[^,],%*[^:]:%[^(](%*[^)])",midicommand))
+    {
+        printf("ERROR in config line: %s, could not get MIDI command!\n",config);
+        return -1;
+    }
+
     //next the midi command
     /*
       noteon( channel, noteNumber, velocity );
@@ -276,12 +298,204 @@ int get_pair_midicommand(char* midicommand, path* p)
     return n;
 }
 
+
+int get_pair_mapping(char* config, pair* p, int n)
+{
+    char argnames[200],midiargs[200],
+        arg0[70], arg1[70], arg2[70], arg3[70],
+        pre[50], var[50], post[50], work[50];
+    char *tmp, margs[4];
+    float arg[4] = {0,0,0,0};
+    int i,j,k;
+
+    if(2 < sscanf(config,"%*s %*[^,],%[^:]:%*[^(](%[^)])",argnames,midiargs))
+    {
+        if(!sscanf(config,"%*s %*[^,],%[*^:]:%*[^(](%[^)])",midiargs))
+        {
+            printf("ERROR in config line: %s, could not get MIDI command arguments!\n",config);
+            return -1;
+        }
+        argnames[0] = 0;//all constants in midi command
+    }
+
+    //lets get those arguments
+    rm_whitespace(argnames);
+    i = sscanf(midiargs,"%[^,],%[^,],%[^,],%[^,]",arg0,arg1,arg2,arg3);
+    if(n != i)
+    {
+        printf("ERROR in config line: %s, incorrect number of args in midi command!\n",config);
+        return -1;
+    }
+
+    //and the most difficult part: the mapping
+    marg[0] = arg0;
+    marg[1] = arg1;
+    marg[2] = arg2;
+    marg[3] = arg3;
+    pre[0] = 0;
+    var[0] = 0;
+    post[0] = 0;
+    for(i=0;i<n;i++)//go through each argument
+    {
+        p->scale[i] = 0;
+        p->offset[i] = 0;
+
+        tmp = marg[i];
+        if( !(j = sscanf(tmp,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,var,post)) )
+        {
+            j = sscanf(tmp,"%[^*/+-]%[.1234567890*/+-]",var,post);
+        }
+        if(!j)
+        {
+            printf("ERROR in config line: %s, could not understand arg %i in midi command\n",config,i);
+            p->argc_in_path += p->argc;
+            while(p->argc_in_path >=0)
+            {
+                free(p->path[p->argc_in_path--]);
+            }
+            free(p->types);
+            free(p->map);
+            free(p->path);
+            free(p)
+            return -1;
+        }
+        if (strlen(var)==0)
+        {
+            //must be a constant
+            if(!sscanf(pre,"%f",&f))
+            {
+                printf("ERROR in config line: %s, could not get constant arg %i in midi command\n",config,i);
+                return -1;
+            }
+            arg[i] = (uint8_t)f;
+        }
+        else//not a constant
+        {
+            //check if its the global channel keyword
+            if(!strncmp(var,"channel",7))
+            {
+                p->use_glob_chan = 1;
+                p->scale[i] = 1;
+                p->offset[i] = 0;
+                arg[i] = 0;
+            }
+            else
+            {
+                //find where it is in the OSC message
+                k = strlen(var);
+                tmp = argnames;
+                for(j=0;(j<p->argc_in_path+p->argc) && tmp;j++)
+                {
+                    if(!strncmp(var,tmp,k))
+                    {
+                        //match
+                        p->map[j] = i;                    
+                    }
+                    else
+                    {
+                        //next arg name
+                        tmp = strchr(tmp,',');
+                    }
+                }
+                //get conditioning, should be pre=b+a* and/or post=*a+b
+                if(strlen(pre))
+                {
+                    char s1[4],s2[4];
+                    float a,b;
+                    switch(sscanf(pre,"%f%[-+* ]%f%[+-* ]",&b,s1,&a,s2))
+                    {
+                        case 4:
+                            if(strchr(s2,'*'))//only multiply makes sense here
+                            {
+                                p->scale[i] *= a;
+                            }
+                            else
+                            {
+                                printf("ERROR in config line: %s, incorrect number of args in midi command!\n",config);
+                                return -1;
+                            }
+                        case 2:
+                            if(strchr(s1,'*'))
+                            {
+                                p->scale[i] *= b;
+                            }
+                            else if(strchr(s1,'+'))
+                            {
+                                p->offset[i] += b;
+                            }
+                            else if(strchr(s1,'-'))
+                            {
+                                p->offset[i] += b;
+                                p->scale[i] *= -1;
+                            }
+                            break;
+                        default:
+                            if(strchr(post,'-'))
+                            {
+                                p->scale[i] *= -1;
+                            }
+                            else
+                            {
+                                //error abort
+                            }
+                    }//switch
+                }//if pre conditions
+                if(strlen(post))
+                {
+                    char s1[4],s2[4];
+                    float a,b;
+                    switch(sscanf(post,"%[-+*/ ]%f%[+- ]%f",s1,&a,s2,&b))
+                    {
+                        case 4:
+                            if(strchr(s2,'+'))//only add/subtract makes sense here
+                            {
+                                p->offset[i] += b;
+                            }
+                            else if(strchr(s2,'-'))
+                            {
+                                p->offset[i] -= b;
+                            }
+                            else
+                            {
+                                //error
+                            }
+                        case 2:
+                            if(strchr(s1,'*'))
+                            {
+                                p->scale[i] *= a;
+                            }
+                            else if(strchr(s1,'/'))
+                            {
+                               p->scale[i] /= a; 
+                            }
+                            else if(strchr(s1,'+'))
+                            {
+                                p->offset[i] += a;
+                            }
+                            else if(strchr(s1,'-'))
+                            {
+                                p->offset[i] -= a;
+                            }
+                            break;
+                        default:
+                            //error abort
+                    }//switch
+                    
+                }//if post conditioning
+            }//not global channel
+        }//not constant
+    }//for each arg
+    p->channel = arg[0];
+    p->data1 = arg[1];
+    p->data2 = arg[2];
+    p->opcode += arg[3];
+}
+
 int abort_pair_alloc(int step)
 {
     switch(step)
     {
         case 3:
-            //p->argc_in_path += p->argc;
             free(p->types);
             free(p->map);
         case 2:
@@ -349,142 +563,8 @@ int alloc_pair(pair* p, char* config, uint8_t *glob_chan)
     if(-1 == n)
         return abort_pair_alloc(3);
 
-    
-    char arg0[70], arg1[70], arg2[70], arg3[70], pre[50], var[50], post[50], work[50];
-    //lets get those arguments
-    rm_whitespace(argnames);
-    i = sscanf(midiargs,"%[^,],%[^,],%[^,],%[^,]",arg0,arg1,arg2,arg3);
-    if(n != i)
-    {
-        printf("ERROR in config line: %s, incorrect number of args in midi command!\n",config);
-        while(p->argc_in_path >=0)
-        {
-            free(p->path[p->argc_in_path--]);
-        }
-        free(p->perc);
-        free(p->types);
-        free(p->map);
-        free(p->path);
-        free(p)
-        return -1;
-    }
-
-    //and the most difficult part: the mapping
-    marg[0] = arg0;
-    marg[1] = arg1;
-    marg[2] = arg2;
-    marg[3] = arg3;
-    pre[0] = 0;
-    var[0] = 0;
-    post[0] = 0;
-    for(i=0;i<n;i++)//go through each argument
-    {
-        p->scale[i] = 0;
-        p->offset[i] = 0;
-
-        tmp = marg[i];
-        if( !(j = sscanf(tmp,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,var,post)) )
-        {
-            j = sscanf(tmp,"%[^*/+-]%[.1234567890*/+-]",var,post);
-        }
-        if(!j)
-        {
-            printf("ERROR in config line: %s, could not understand arg %i in midi command\n",config,i);
-            p->argc_in_path += p->argc;
-            while(p->argc_in_path >=0)
-            {
-                free(p->path[p->argc_in_path--]);
-            }
-            free(p->types);
-            free(p->map);
-            free(p->path);
-            free(p)
-            return -1;
-        }
-        if (strlen(var)==0)
-        {
-            //must be a constant
-            if(!sscanf(pre,"%f",&f))
-            {
-                printf("ERROR in config line: %s, could not get constant arg %i in midi command\n",config,i);
-                p->argc_in_path += p->argc;
-                while(p->argc_in_path >=0)
-                {
-                    free(p->path[p->argc_in_path--]);
-                }
-                free(p->types);
-                free(p->map);
-                free(p->path);
-                free(p)
-                return -1;
-            }
-            arg[i] = (uint8_t)f;
-        }
-        else//not a constant
-        {
-            //check if its the global channel keyword
-            if(!strncmp(var,"channel",7))
-            {
-                p->use_glob_chan = 1;
-                p->scale[i] = 0;
-                p->offset[i] = 0;
-                arg[i] = 0;
-            }
-            else
-            {
-                //find where it is in the OSC message
-                k = strlen(var);
-                tmp = argnames;
-                for(j=0;(j<p->argc_in_path+p->argc) && tmp;j++)
-                {
-                    if(!strncmp(var,tmp,k))
-                    {
-                        //match
-                        p->map[j] = i;                    
-                    }
-                    else
-                    {
-                        //next arg name
-                        tmp = strchr(tmp,',');
-                    }
-                }
-                //get conditioning, should be pre=b+a* and/or post=*a+b
-                if(strlen(post))
-                {
-                    char s1[4],s2[4];
-                    float a,b;
-                    switch(sscanf(post,"%f%[-+* ]%f%[+-* ]",&b,s1,&a,s2))
-                    {
-                        case 4:
-                            if(strchr(s2,'*'))//only multiply makes sense here
-                            {
-                                p->scale[i] = a;
-                            }
-                            else
-                            {
-                                //error. abort
-                            }
-                        case 2:
-                            if(strchr(s1,'*'))
-                            {
-                            }
-                            else if(strchr(s1,'+'))
-                            {
-                            }
-                            else if(strchr(s1,'-'))
-                            {
-                            }
-                    }
-                }
-                if(strlen(pre))
-                {
-                    
-                }
-            }
-        }//not constant
-    }//for each arg
-    
-
+    if(-1 == get_pair_mapping(config,p,n))
+        return abort_pair_alloc(3);
 }
 
 int free_pair(pair* p)
@@ -544,6 +624,10 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
         if(p->map[i] != -1)
         {
             msg[p->map[i]] += (uint8_t)(p->scale[i]*v + p->offset[i]); 
+            if(p->opcode == 0xE0 && p->map[i] == 1)//pitchbend is special case (14 bit number)
+            {
+                msg[p->map[i]+1] += (uint8_t)((p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path])/128.0); 
+            }
         }
     }
     //compare the end of the path
@@ -622,10 +706,14 @@ int try_match_osc(pair* p, char* path, char* types, lo_arg** argv, int argc, uin
             else
             {
                 msg[p->map[i+p->argc_in_path]] += (uint8_t)(p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path]); 
+                if(p->opcode == 0xE0 && p->map[i+p->argc_in_path] == 1)//pitchbend is special case (14 bit number)
+                {
+                    msg[p->map[i+p->argc_in_path]+1] += (uint8_t)((p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path])/128.0); 
+                }
             }
         }//if arg is used
     }//for args
 }
 
-int try_match_midi(pair*, uint8_t msg[], lo_message *osc);
+int try_match_midi(pair*, uint8_t msg[], lo_message *osc){}
 
