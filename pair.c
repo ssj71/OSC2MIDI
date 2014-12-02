@@ -37,7 +37,9 @@ typedef struct _PAIR
 
 }PAIR;
 
-void print_pair(PAIRHANDLE* ph)
+char * opcode2cmd(uint8_t opcode);
+
+void print_pair(PAIRHANDLE ph)
 {
     int i;
     PAIR* p = (PAIR*)ph;
@@ -45,8 +47,11 @@ void print_pair(PAIRHANDLE* ph)
     //path
     for(i=0;i<p->argc_in_path;i++)
     {
-        printf("%s",p->path[i]);
+        p->path[i][p->perc[i]] = '{';
+        printf("%s}",p->path[i]);
+        p->path[i][p->perc[i]] = '%';
     }
+        printf("%s",p->path[i]);
     
     //types
     printf(" %s, ",p->types);
@@ -61,35 +66,46 @@ void print_pair(PAIRHANDLE* ph)
         printf("%c, ",'a'+i);
     }
     
-    //command global channel
-    printf(": rawmidi(");
+    //command
+    printf(": %s",opcode2cmd(p->opcode));
+    if(p->opcode==0x80)
+    {
+        //check if 4 arguments
+        for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=3;i++);
+        if(i==p->argc+p->argc_in_path)
+            printf("off");
+    }
+    printf("(");
+
+    //global channel
     if(p->use_glob_chan)
-        printf(" glob_chan +");
+        printf(" glob_chan");
 
     //midi arg 0
-    printf(" %i + %i + ",p->opcode,p->channel);
+    if(p->channel)printf(" %i",p->channel);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=0;i++);
     if(i<p->argc+p->argc_in_path)
         printf("%.2f*%c + %.2f",p->scale[0],'a'+i,p->offset[0]);
     
+    
+    //midi arg1
+    if(p->data1)printf(", %i",p->data1);
+    for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=1;i++);
+    if(i<p->argc+p->argc_in_path)
+        printf(", %.2f*%c + %.2f",p->scale[1],'a'+i,p->offset[1]);
+    
+    //midi arg2
+    if(p->data2)printf(", %i",p->data2);
+    for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=2;i++);
+    if(i<p->argc+p->argc_in_path)
+        printf(", %.2f*%c + %.2f",p->scale[2],'a'+i,p->offset[2]);
+
     //midi arg3 (only for note on/off)
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=3;i++);
     if(i<p->argc+p->argc_in_path)
-        printf(" + %.2f*%c + %.2f",p->scale[3],'a'+i,p->offset[3]);
-    
-    //midi arg1
-    printf(", %i + ",p->data1);
-    for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=1;i++);
-    if(i<p->argc+p->argc_in_path)
-        printf("%.2f*%c + %.2f",p->scale[1],'a'+i,p->offset[1]);
-    
-    //midi arg2
-    printf(", %i + ",p->data2);
-    for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=2;i++);
-    if(i<p->argc+p->argc_in_path)
-        printf("%.2f*%c + %.2f",p->scale[2],'a'+i,p->offset[2]);
+        printf(", %.2f*%c + %.2f",p->scale[3],'a'+i,p->offset[3]);
 
-    printf(")\n");
+    printf(" )\n");
 }
 
 void rm_whitespace(char* str)
@@ -123,9 +139,13 @@ int get_pair_path(char* config, PAIR* p)
     prev = path;
     tmp = path;
     i = 1;
-    while(tmp = strchr(tmp,'{'))i++;
+    while(tmp = strchr(tmp,'{'))
+    {
+        i++;
+        tmp++;
+    }
     p->path = (char**)malloc(sizeof(char*)*i);
-    p->perc = (int*)malloc(sizeof(int)*i);
+    p->perc = (int*)malloc(sizeof(int)*(i-1));
     //now break it up into chunks
     while(tmp = strchr(prev,'{'))
     {
@@ -136,24 +156,25 @@ int get_pair_path(char* config, PAIR* p)
         while(tmp = strchr(tmp,'%')) i++;
         p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*n+i+3);
         //double check the variable is good
-        i = sscanf(prev,"%*[^{]<%[^}]",var);
+        i = sscanf(prev,"%*[^{]{%[^}]}",var);
         if(i < 1 || !strchr(var,'i'))
         {
-            printf("ERROR in config line: %s, could not get variable in OSC path, use \'<i>\'!\n",config);
+            printf("ERROR in config line: %s, could not get variable in OSC path, use \'{i}\'!\n",config);
             return -1;
         }
         //copy over path segment, delimit any % characters 
         j=0;
         for(i=0;i<n;i++)
         {
-            if(prev[i] != '%')
+            if(prev[i] == '%')
                 p->path[p->argc_in_path][j++] = '%';
             p->path[p->argc_in_path][j++] = prev[i];
         }
         p->path[p->argc_in_path][j] = 0;//null terminate to be safe
         p->perc[p->argc_in_path] = j;//mark where the format percent sign is
         strcat(p->path[p->argc_in_path++],"%i");
-        prev = strchr(prev++,'}');
+        prev = strchr(prev,'}');
+        prev++;
     }
     //allocate space for end of path and copy
     p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*strlen(prev));
@@ -280,19 +301,22 @@ int get_pair_midicommand(char* config, PAIR* p)
     }
     else if(strstr(midicommand,"midimessage"))
     {
-        p->opcode = 0x00;
+        p->opcode = 0x01;
+        p->channel = 0xFF;
         n = 1;
     }
     //non-midi commands
     else if(strstr(midicommand,"setchannel"))
     {
-        p->opcode = 0x00;
+        p->opcode = 0x02;
+        p->channel = 0xFE;
         n = 1;
         p->set_channel = 1;
     }
     else if(strstr(midicommand,"setshift"))
     {
-        p->opcode = 0x00;
+        p->opcode = 0x03;
+        p->channel = 0xFD;
         n = 1;
     }
     else
@@ -325,6 +349,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
 
     //lets get those arguments
     rm_whitespace(argnames);
+    strcat(argnames,",");//add trailing comma
     i = sscanf(midiargs,"%[^,],%[^,],%[^,],%[^,]",arg0,arg1,arg2,arg3);
     if(n != i)
     {
@@ -337,18 +362,18 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     marg[1] = arg1;
     marg[2] = arg2;
     marg[3] = arg3;
-    pre[0] = 0;
-    var[0] = 0;
-    post[0] = 0;
     for(i=0;i<n;i++)//go through each argument
     {
-        p->scale[i] = 0;
+        p->scale[i] = 1;
         p->offset[i] = 0;
+        pre[0] = 0;
+        var[0] = 0;
+        post[0] = 0;
 
         tmp = marg[i];
         if( !(j = sscanf(tmp,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,var,post)) )
         {
-            j = sscanf(tmp,"%[^*/+-]%[.1234567890*/+-]",var,post);
+            j = sscanf(tmp,"%[^*/+- ]%[.1234567890*/+- ]",var,post);
         }
         if(!j)
         {
@@ -382,16 +407,24 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                 tmp = argnames;
                 for(j=0;(j<p->argc_in_path+p->argc) && tmp;j++)
                 {
-                    if(!strncmp(var,tmp,k))
+                    if(!strncmp(var,tmp,k) && *(tmp+k) == ',')
                     {
                         //match
                         p->map[j] = i;                    
+                        tmp = 0;//exit loop
+                        j--;
                     }
                     else
                     {
                         //next arg name
                         tmp = strchr(tmp,',');
+                        tmp++;//go to char after ','
                     }
+                }
+                if(j==p->argc_in_path+p->argc)
+                {
+                                printf("ERROR in config line: %s, variable %s not identified in OSC message!\n",config,var);
+                                return -1;
                 }
                 //get conditioning, should be pre=b+a* and/or post=*a+b
                 if(strlen(pre))
@@ -426,15 +459,17 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                             }
                             break;
                         default:
-                            if(strchr(post,'-'))
+                            if(strchr(pre,'-'))
                             {
                                 p->scale[i] *= -1;
                             }
                             else
                             {
-                                printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
-                                return -1; 
+                               // printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
+                                //return -1; 
+                                //just ignore it
                             }
+                            break;
                     }//switch
                 }//if pre conditions
                 if(strlen(post))
@@ -476,8 +511,10 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                             }
                             break;
                         default:
-                            printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
-                            return -1; 
+                            //printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
+                            //return -1; 
+                            //ignore it
+                            break;
                     }//switch
                     
                 }//if post conditioning
@@ -509,13 +546,13 @@ int abort_pair_alloc(int step, PAIR* p)
         default:
             break;
     }
-    return -1;
+    return 0;
 }
 
-int alloc_pair(PAIRHANDLE ph, char* config, uint8_t *glob_chan)
+PAIRHANDLE alloc_pair(char* config, uint8_t *glob_chan)
 {
     //path argtypes, arg1, arg2, ... argn : midicommand(arg1+4, arg3, 2*arg4);
-    PAIR* p = (PAIR*)ph;
+    PAIR* p;
     int n;
 
     p = (PAIR*)malloc(sizeof(PAIR));
@@ -531,19 +568,22 @@ int alloc_pair(PAIRHANDLE ph, char* config, uint8_t *glob_chan)
 
     //config into separate parts
     if(-1 == get_pair_path(config,p))
-        return abort_pair_alloc(2,p);
+        return (PAIRHANDLE)abort_pair_alloc(2,p);
 
 
     if(-1 == get_pair_argtypes(config,p))
-        return abort_pair_alloc(3,p);
+        return (PAIRHANDLE)abort_pair_alloc(3,p);
 
 
     n = get_pair_midicommand(config,p);
     if(-1 == n)
-        return abort_pair_alloc(3,p);
+        return (PAIRHANDLE)abort_pair_alloc(3,p);
+
 
     if(-1 == get_pair_mapping(config,p,n))
-        return abort_pair_alloc(3,p);
+        return (PAIRHANDLE)abort_pair_alloc(3,p);
+
+    return p;//success
 }
 
 int free_pair(PAIRHANDLE ph)
@@ -700,3 +740,31 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
 
 int try_match_midi(PAIRHANDLE ph, uint8_t msg[], lo_message *osc){}
 
+char * opcode2cmd(uint8_t opcode)
+{
+    switch(opcode)
+    {
+        case 0x90:
+            return "noteon";
+        case 0x80:
+            return "note";
+        case 0xA0:
+            return "polyaftertouch";
+        case 0xB0:
+            return "controlchange";
+        case 0xC0:
+            return "programchange";
+        case 0xD0:
+            return "aftertouch";
+        case 0xE0:
+            return "pitchbend";
+        case 0x00:
+            return "rawmidi";
+        case 0x01:
+            return "midimessage";
+        case 0x02:
+            return "setchannel";
+        case 0x03:
+            return "setshift";
+    }
+}
