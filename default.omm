@@ -11,7 +11,7 @@
 
 /midi/cc{i} f, ctl, val   : controlchange( channel, ctl, val/127 );
 /midi/pc f, pgm           : programchange( channel, pgm );  
-/midi/pitch f, bend       : pitchbend( chanel, bend*8192 );
+/midi/pitch f, bend       : pitchbend( channel, bend*8192 );
 /midi/noteon{i} i, n,vel  : noteon( channel, n, vel);
 /midi/noteoff{i} i, n,vel : noteon( channel, n, vel );
 /chan i,c                 : setchannel( c )

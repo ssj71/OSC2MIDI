@@ -79,7 +79,7 @@ void print_pair(PAIRHANDLE ph)
 
     //global channel
     if(p->use_glob_chan)
-        printf(" glob_chan");
+        printf(" channel");
 
     //midi arg 0
     if(p->channel)printf(" %i",p->channel);
@@ -130,7 +130,7 @@ int get_pair_path(char* config, PAIR* p)
     char var[100];
     if(!sscanf(config,"%s %*[^,],%*[^:]:%*[^(](%*[^)])",path))
     {
-        printf("ERROR in config line: %s, could not get OSC path!\n",config);
+        printf("\nERROR in config line:\n%s -could not get OSC path!\n\n",config);
         return -1;
     }
 
@@ -159,7 +159,7 @@ int get_pair_path(char* config, PAIR* p)
         i = sscanf(prev,"%*[^{]{%[^}]}",var);
         if(i < 1 || !strchr(var,'i'))
         {
-            printf("ERROR in config line: %s, could not get variable in OSC path, use \'{i}\'!\n",config);
+            printf("\nERROR in config line:\n%s -could not get variable in OSC path, use \'{i}\'!\n\n",config);
             return -1;
         }
         //copy over path segment, delimit any % characters 
@@ -187,7 +187,7 @@ int get_pair_argtypes(char* config, PAIR* p)
     int i,j = 0;
     if(!sscanf(config,"%*s %[^,],%*[^:]:%*[^(](%*[^)])",argtypes))
     {
-        printf("ERROR in config line: %s, could not get OSC data types!\n",config);
+        printf("\nERROR in config line:\n%s -could not get OSC data types!\n\n",config);
         return -1;
     }
 
@@ -218,7 +218,7 @@ int get_pair_argtypes(char* config, PAIR* p)
             case ' ':
                 break;
             default:
-                printf("ERROR in config line: %s, argument type '%c' not supported!\n",config,argtypes[i]);
+                printf("\nERROR in config line:\n%s -argument type '%c' not supported!\n\n",config,argtypes[i]);
                 return -1;
                 break;
         }
@@ -232,7 +232,7 @@ int get_pair_midicommand(char* config, PAIR* p)
     int n;
     if(!sscanf(config,"%*s %*[^,],%*[^:]:%[^(](%*[^)])",midicommand))
     {
-        printf("ERROR in config line: %s, could not get MIDI command!\n",config);
+        printf("\nERROR in config line:\n%s -could not get MIDI command!\n\n",config);
         return -1;
     }
 
@@ -321,7 +321,7 @@ int get_pair_midicommand(char* config, PAIR* p)
     }
     else
     {
-        printf("ERROR in config line: %s, midi command %s unknown!\n",config,midicommand);
+        printf("\nERROR in config line:\n%s -midi command %s unknown!\n\n",config,midicommand);
         return -1;
     }
     return n;
@@ -341,7 +341,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     {
         if(!sscanf(config,"%*s %*[^,],%*[^:]:%*[^(](%[^)])",midiargs))
         {
-            printf("ERROR in config line: %s, could not get MIDI command arguments!\n",config);
+            printf("\nERROR in config line:\n%s -could not get MIDI command arguments!\n\n",config);
             return -1;
         }
         argnames[0] = 0;//all constants in midi command
@@ -353,7 +353,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     i = sscanf(midiargs,"%[^,],%[^,],%[^,],%[^,]",arg0,arg1,arg2,arg3);
     if(n != i)
     {
-        printf("ERROR in config line: %s, incorrect number of args in midi command!\n",config);
+        printf("\nERROR in config line:\n%s -incorrect number of args in midi command!\n\n",config);
         return -1;
     }
 
@@ -377,7 +377,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
         }
         if(!j)
         {
-            printf("ERROR in config line: %s, could not understand arg %i in midi command\n",config,i);
+            printf("\nERROR in config line:\n%s -could not understand arg %i in midi command\n\n",config,i);
             return -1;
         }
         if (strlen(var)==0)
@@ -385,7 +385,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             //must be a constant
             if(!sscanf(pre,"%f",&f))
             {
-                printf("ERROR in config line: %s, could not get constant arg %i in midi command\n",config,i);
+                printf("\nERROR in config line:\n%s -could not get constant arg %i in midi command\n\n",config,i);
                 return -1;
             }
             arg[i] = (uint8_t)f;
@@ -423,7 +423,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                 }
                 if(j==p->argc_in_path+p->argc)
                 {
-                                printf("ERROR in config line: %s, variable %s not identified in OSC message!\n",config,var);
+                                printf("\nERROR in config line:\n%s -variable %s not identified in OSC message!\n\n",config,var);
                                 return -1;
                 }
                 //get conditioning, should be pre=b+a* and/or post=*a+b
@@ -440,7 +440,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                             }
                             else
                             {
-                                printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
+                                printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
                                 return -1;
                             }
                         case 2:
@@ -465,7 +465,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                             }
                             else
                             {
-                               // printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
+                               // printf("\nERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
                                 //return -1; 
                                 //just ignore it
                             }
@@ -489,7 +489,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                             }
                             else
                             {
-                                printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
+                                printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
                                 return -1; 
                             }
                         case 2:
@@ -511,7 +511,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                             }
                             break;
                         default:
-                            //printf("ERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
+                            //printf("\nERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
                             //return -1; 
                             //ignore it
                             break;
