@@ -1,36 +1,41 @@
 #this mapping works with all the default interfaces that come with control
 
- # conways game of life
-/life/{i} i, note, val : note(channel, note+7,120, val);
  # multitouch
-/multi/{i} ff, touch,x,y : controlchange(channel, touch, x*127);
-/multi/{i} ff, touch,x,y : controlchange(channel, touch+10, y*127);
+/multi/{i} ff, touch,x,y : controlchange( channel, touch, x*127);
+/multi/{i} ff, touch,x,y : controlchange( channel, touch+10, y*127);
  # mixer
-/pan{i} i,
-/mute{i} i,
-/vol{i} f,
+/pan{i} i, cc,val  : controlchange( channel, cc*4, val*63.5 + 63.5);
+/mute{i} i, cc,val : controlchange( channel, cc*4+1, val*127);
+/solo{i} i, cc,val : controlchange( channel, cc*4+2, val*127);
+/vol{i} f, cc,val  : controlchange( channel, cc*4+3, val*127);
  # DJ
-/leftHighCut i,
-/leftMidCut i,
-/leftLowCut i,
-/leftVolume f,
-/leftMulti/{i} f,
-/leftCue i,
-/crossfader i,
-/rightHighCut i,
-/rightMidCut i,
-/rightLowCut i,
-/rightVolume f,
-/rightMulti/{i} f,
-/rightCue i,
+/leftHighCut i, val : controlchange( channel, 1, val);
+/leftMidCut i, val : controlchange( channel, 2, val);
+/leftLowCut i, val : controlchange( channel, 3, val);
+/leftVolume f, val : controlchange( channel, 4, val);
+/leftMulti{i} f, indx,val : controlchange( channel, 5+indx, val);
+/leftCue i, val : controlchange( channel, 9, val);
+/crossfader f, val : controlchange( channel, 10, val);
+/crossfader i, val : controlchange( channel, 10, val);
+/rightHighCut i, val : controlchange( channel, 11, val);
+/rightMidCut i, val : controlchange( channel, 12, val);
+/rightLowCut i, val : controlchange( channel, 13, val);
+/rightVolume f, val : controlchange( channel, 14, val);
+/rightMulti{i} f, indx,val : controlchange( channel, 15+indx, val);
+/rightCue i, val : controlchange( channel, 19, val);
+ # conways game of life
+/life/{i} i, note, val : note( channel, note+7,120, val);
  # monome
-/slider{i} f,
-/mlr/press iii, x,y,val :
+/slider{i} f, indx,val : controlchange( channel, indx, val);
+/mlr/press iii, x,y,val : note( channel, x*2+54, 100, val);
+/mlr/press iii, x,y,val : note( channel, y*4+48, 100, val);
  # multibutton
-/multi/{i} i,
+/multi/{i} i, indx,val : note( channel, 108-11*indx/8, 100, val);
  # sequencer
-/sliders{i}/{i} f, cc,step :
-/grid/{i} i, button,state : 
+/sliders{i}/{i} f, cc,step,val : controlchange( channel, cc, val);
+/grid/{i} i, button,state : note( channel, 84-button/32, 100, state);
  # accelerometer
-/accelerometer fff, x,y,z :
+/accelerometer fff, x,y,z : controlchange( channel, 1, x);
+/accelerometer fff, x,y,z : controlchange( channel, 2, y);
+/accelerometer fff, x,y,z : controlchange( channel, 3, z);
 

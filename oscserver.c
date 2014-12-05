@@ -8,39 +8,40 @@
 #include "lo/lo.h"
 #include "pair.h"
 #include "oscserver.h"
+#include "converter.h"
 
 int done = 0;
 
 void error(int num, const char *m, const char *path);
 
+int mon_handler(const char *path, const char *types, lo_arg ** argv,
+                    int argc, void *data, void *user_data);
 int msg_handler(const char *path, const char *types, lo_arg ** argv,
                     int argc, void *data, void *user_data);
 
 
-int run_osc_server(char* port)
+lo_server_thread start_osc_server(char* port, CONVERTER* data)
 {
     /* start a new server on port 7770 */
     lo_server_thread st = lo_server_thread_new(port, error);
 
     /* add method that will match any path and args */
-    lo_server_thread_add_method(st, NULL, NULL, msg_handler, NULL);
+    if(data->mon_mode)
+        lo_server_thread_add_method(st, NULL, NULL, mon_handler, NULL);
+    else
+        lo_server_thread_add_method(st, NULL, NULL, msg_handler, data);
 
     lo_server_thread_start(st);
-    //if(verbose)
+    if(data->verbose)
     {
         printf("starting osc server on port %s\n",port);
     }
+    return st;
+}
 
 
-    //add code to setup a client for midi->osc
-
-    while (!done) {
-        usleep(1000);
-        //add whatever code here to read midi ring buffer and send lo messages
-
-        //maybe should break this up into start and stop with a handle passed
-    }
-
+int stop_osc_server(lo_server_thread st)
+{
     lo_server_thread_free(st);
 
     return 0;
@@ -54,19 +55,60 @@ void error(int num, const char *msg, const char *path)
 
 /* catch any incoming messages and display them. returning 1 means that the
  * message has not been fully handled and the server should try other methods */
-int msg_handler(const char *path, const char *types, lo_arg ** argv,
+int mon_handler(const char *path, const char *types, lo_arg ** argv,
                     int argc, void *data, void *user_data)
 {
     int i;
 
-    printf("path: <%s>\n", path);
+    printf("%s ", path);
     for (i = 0; i < argc; i++) {
-        printf("arg %d '%c' ", i, types[i]);
-        lo_arg_pp((lo_type)types[i], argv[i]);
-        printf("\n");
+        printf("%c", types[i]);
     }
-    printf("\n");
+    for (i = 0; i < argc; i++) {
+        printf(", ");
+        lo_arg_pp((lo_type)types[i], argv[i]);
+    }
+    printf("\n\n");
     fflush(stdout);
 
+    return 1;
+}
+
+int msg_handler(const char *path, const char *types, lo_arg ** argv,
+                    int argc, void *data, void *user_data)
+{
+    int i,j;
+    uint8_t first = 1;
+    uint8_t midi[3];
+    CONVERTER* conv = (CONVERTER*)user_data;
+
+    for(j=0;j<conv->npairs;j++)
+    {
+        if(try_match_osc(conv->p[j],(char *)path,(char *)types,argv,argc,&(conv->glob_chan),midi))
+        {
+            if(!conv->multi_match)
+                j = conv->npairs;
+            if(conv->verbose)
+            {
+                if(first)
+                    printf("matches found:\n");
+                first = 0;
+                printf("  %s ", path);
+                for (i = 0; i < argc; i++) {
+                    printf("%c", types[i]);
+                }
+                for (i = 0; i < argc; i++) {
+                    printf(", ");
+                    lo_arg_pp((lo_type)types[i], argv[i]);
+                }
+                printf(" : %s ( %i, %i, %i )\n", opcode2cmd(midi[0]&0xF0,1), midi[0]&0x0F, midi[1], midi[2]);
+                fflush(stdout);
+            }
+
+            //push message onto ringbuffer (with timestamp)
+        }
+    }
+    if(conv->verbose && !first)
+        printf("\n");
     return 1;
 }

@@ -24,7 +24,7 @@ typedef struct _PAIR
     int8_t* map;//which byte in the midi message by index of var in OSC message (including in path args)
     float scale[4];//scale factor for each argument going into the midi message
     float offset[4];//linear offset for each arg going to midi message
-    uint8_t *glob_chan;//pointer to global channel
+    //uint8_t *glob_chan;//pointer to global channel
     uint8_t use_glob_chan;//flag decides if using global channel (1) or if its specified by message (0)
     uint8_t set_channel;//flag if message is actually control message to change global channel
     uint8_t raw_midi;//flag if message sends osc datatype of midi message
@@ -37,7 +37,6 @@ typedef struct _PAIR
 
 }PAIR;
 
-char * opcode2cmd(uint8_t opcode);
 
 void print_pair(PAIRHANDLE ph)
 {
@@ -67,7 +66,7 @@ void print_pair(PAIRHANDLE ph)
     }
     
     //command
-    printf(": %s",opcode2cmd(p->opcode));
+    printf("\b\b\b : %s",opcode2cmd(p->opcode, 0));
     if(p->opcode==0x80)
     {
         //check if 4 arguments
@@ -106,6 +105,22 @@ void print_pair(PAIRHANDLE ph)
         printf(", %.2f*%c + %.2f",p->scale[3],'a'+i,p->offset[3]);
 
     printf(" )\n");
+
+    //debugging view
+#if(0)
+    printf("  l: %i, map: ", p->argc+p->argc_in_path);
+    for(i=0;i<p->argc+p->argc_in_path;i++)
+        printf("%i ",p->map[i]);
+    printf("\n");
+    printf("       scale: ");
+    for(i=0;i<p->argc+p->argc_in_path;i++)
+        printf("%.2f ",p->scale[i]);
+    printf("\n");
+    printf("      offset: ");
+    for(i=0;i<p->argc+p->argc_in_path;i++)
+        printf("%.2f ",p->offset[i]);
+    printf("\n");
+#endif
 }
 
 void rm_whitespace(char* str)
@@ -193,7 +208,7 @@ int get_pair_argtypes(char* config, PAIR* p)
 
     //now get the argument types
     p->types = (char*)malloc( sizeof(char) * (strlen(argtypes)+1) );
-    p->map = (signed char*)malloc( sizeof(char) * (strlen(argtypes)+1) );
+    p->map = (signed char*)malloc( sizeof(char) * (p->argc_in_path+strlen(argtypes)+1) );
     for(i=0;i<strlen(argtypes);i++)
     {
         switch(argtypes[i])
@@ -224,6 +239,8 @@ int get_pair_argtypes(char* config, PAIR* p)
         }
     }
     p->types[j] = 0;//null terminate. Its good practice
+    for(i=0;i<strlen(argtypes)+p->argc_in_path;i++)
+        p->map[j] = -1;//initialize mapping for in-path args
 }
 
 int get_pair_midicommand(char* config, PAIR* p)
@@ -337,6 +354,10 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     float f,arg[4] = {0,0,0,0};
     int i,j,k;
 
+    arg0[0]=0;
+    arg1[0]=0;
+    arg2[0]=0;
+    arg3[0]=0;
     if(2 < sscanf(config,"%*s %*[^,],%[^:]:%*[^(](%[^)])",argnames,midiargs))
     {
         if(!sscanf(config,"%*s %*[^,],%*[^:]:%*[^(](%[^)])",midiargs))
@@ -549,7 +570,7 @@ int abort_pair_alloc(int step, PAIR* p)
     return 0;
 }
 
-PAIRHANDLE alloc_pair(char* config, uint8_t *glob_chan)
+PAIRHANDLE alloc_pair(char* config)
 {
     //path argtypes, arg1, arg2, ... argn : midicommand(arg1+4, arg3, 2*arg4);
     PAIR* p;
@@ -601,7 +622,7 @@ int free_pair(PAIRHANDLE ph)
 }
 
 //returns 1 if match is successful and msg has a message to be sent to the output
-int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int argc, uint8_t msg[])
+int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int argc,uint8_t* glob_chan, uint8_t msg[])
 {
     PAIR* p = (PAIR*)ph;
     //check the easy things first
@@ -621,12 +642,13 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
     msg[2] = p->data2;
     if(p->use_glob_chan)
     {
-        msg[0] += *p->glob_chan;
+        msg[0] += *glob_chan;
     }
 
     //now start trying to get the data
     int i,v;
     char *tmp;
+    int place;
     for(i=0;i<p->argc_in_path;i++)
     {
   
@@ -644,12 +666,13 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
             return 0;
         }
         //put it in the message;
-        if(p->map[i] != -1)
+        place = p->map[i];
+        if(place != -1)
         {
-            msg[p->map[i]] += (uint8_t)(p->scale[i]*v + p->offset[i]); 
-            if(p->opcode == 0xE0 && p->map[i] == 1)//pitchbend is special case (14 bit number)
+            msg[place] += (uint8_t)(p->scale[place]*v + p->offset[place]); 
+            if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
             {
-                msg[p->map[i]+1] += (uint8_t)((p->scale[i+p->argc_in_path]*v + p->offset[i+p->argc_in_path])/128.0); 
+                msg[place+1] += (uint8_t)((p->scale[place]*v + p->offset[place])/128.0); 
             }
         }
     }
@@ -661,29 +684,29 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
 
 
     //now the actual osc args
-    int j = 0;
     double val;
     for(i=0;i<p->argc;i++)
     {
         //put it in the message;
-        if(p->map[i+p->argc_in_path] != -1)
+        place = p->map[i+p->argc_in_path];
+        if(place != -1)
         {
             switch(types[i])
             {
                 case 'i':
-                    val = (double)argv[j++]->i;
+                    val = (double)argv[i]->i;
                     break;
                 case 'h'://long
-                    val = (double)argv[j++]->h;
+                    val = (double)argv[i]->h;
                     break;
                 case 'f':
-                    val = (double)argv[j++]->f;
+                    val = (double)argv[i]->f;
                     break;
                 case 'd':
-                    val = (double)argv[j++]->d;
+                    val = (double)argv[i]->d;
                     break;
                 case 'c'://char
-                    val = (double)argv[j++]->c;
+                    val = (double)argv[i]->c;
                     break;
                 case 'T'://true
                     val = 1.0;
@@ -701,9 +724,9 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                     //send full midi message and exit
                     if(p->raw_midi)
                     {
-                        msg[0] = argv[j+1]->i;
-                        msg[1] = argv[j+2]->i;
-                        msg[2] = argv[j+3]->i;
+                        msg[0] = argv[i+1]->i;
+                        msg[1] = argv[i+2]->i;
+                        msg[2] = argv[i+3]->i;
                         return 1;
                     }
 
@@ -719,34 +742,36 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
             //check if this is a message to set global channel
             if(p->set_channel)
             {
-                *p->glob_chan = (uint8_t)val;
+                *glob_chan = (uint8_t)val;
                 return 0;//not an error but don't need to send a midi message
             }   
-            if(p->map[i+p->argc_in_path] == 3)//only used for note on or off
+            if(place == 3)//only used for note on or off
             {
-                msg[0] += ((uint8_t)(p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path])>0)<<4;
+                msg[0] += ((uint8_t)(p->scale[place]*val + p->offset[place])>0)<<4;
             }
             else
             {
-                msg[p->map[i+p->argc_in_path]] += (uint8_t)(p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path]); 
-                if(p->opcode == 0xE0 && p->map[i+p->argc_in_path] == 1)//pitchbend is special case (14 bit number)
+                msg[place] += (uint8_t)(p->scale[place]*val + p->offset[place]); 
+                if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
                 {
-                    msg[p->map[i+p->argc_in_path]+1] += (uint8_t)((p->scale[i+p->argc_in_path]*val + p->offset[i+p->argc_in_path])/128.0); 
+                    msg[place+1] += (uint8_t)((p->scale[place]*val + p->offset[place])/128.0); 
                 }
             }
         }//if arg is used
     }//for args
+    return 1;
 }
 
 int try_match_midi(PAIRHANDLE ph, uint8_t msg[], lo_message *osc){}
 
-char * opcode2cmd(uint8_t opcode)
+char * opcode2cmd(uint8_t opcode, uint8_t noteoff)
 {
     switch(opcode)
     {
         case 0x90:
             return "noteon";
         case 0x80:
+            if(noteoff) return "noteoff";
             return "note";
         case 0xA0:
             return "polyaftertouch";
@@ -766,5 +791,7 @@ char * opcode2cmd(uint8_t opcode)
             return "setchannel";
         case 0x03:
             return "setshift";
+        default:
+            return "unknown";
     }
 }
