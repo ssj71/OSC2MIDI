@@ -1,0 +1,36 @@
+#this mapping works with all the default interfaces that come with control
+
+ # conways game of life
+/life/{i} i, note, val : note(channel, note+7,120, val);
+ # multitouch
+/multi/{i} ff, touch,x,y : controlchange(channel, touch, x*127);
+/multi/{i} ff, touch,x,y : controlchange(channel, touch+10, y*127);
+ # mixer
+/pan{i} i,
+/mute{i} i,
+/vol{i} f,
+ # DJ
+/leftHighCut i,
+/leftMidCut i,
+/leftLowCut i,
+/leftVolume f,
+/leftMulti/{i} f,
+/leftCue i,
+/crossfader i,
+/rightHighCut i,
+/rightMidCut i,
+/rightLowCut i,
+/rightVolume f,
+/rightMulti/{i} f,
+/rightCue i,
+ # monome
+/slider{i} f,
+/mlr/press iii, x,y,val :
+ # multibutton
+/multi/{i} i,
+ # sequencer
+/sliders{i}/{i} f, cc,step :
+/grid/{i} i, button,state : 
+ # accelerometer
+/accelerometer fff, x,y,z :
+

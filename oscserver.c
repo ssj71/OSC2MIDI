@@ -7,6 +7,7 @@
 
 #include "lo/lo.h"
 #include "pair.h"
+#include "oscserver.h"
 
 int done = 0;
 
@@ -25,10 +26,19 @@ int run_osc_server(char* port)
     lo_server_thread_add_method(st, NULL, NULL, msg_handler, NULL);
 
     lo_server_thread_start(st);
+    //if(verbose)
+    {
+        printf("starting osc server on port %s\n",port);
+    }
+
+
+    //add code to setup a client for midi->osc
 
     while (!done) {
         usleep(1000);
-        printf("hi mom!");
+        //add whatever code here to read midi ring buffer and send lo messages
+
+        //maybe should break this up into start and stop with a handle passed
     }
 
     lo_server_thread_free(st);

@@ -8,6 +8,7 @@
 #include<stdint.h>
 #include<string.h>
 #include"pair.h"
+#include"oscserver.h"
 
 int is_empty(const char *s) 
 {
@@ -153,5 +154,6 @@ int main(int argc, char** argv)
         printf("%i pairs total.\n ",i-1);
     }
 
+    run_osc_server("7080");
 
 }
