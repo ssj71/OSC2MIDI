@@ -1,2 +1,12 @@
-THIS PROJECT IS STILL IN PLANNING PHASE.
-Stay tuned and contact me if you are interested in contributing
+THIS PROJECT IS NOW IN AN ALPHA PHASE
+you may begin testing and using this.
+
+To try it out download a snapshot of these files extract them, and open the resulting directory.
+run the command
+ gcc -g *.c -llo -ljack -o osc2midi
+
+
+ then run
+ ./osc2midi -h
+
+ to see the useage and various details that I will write out later.
