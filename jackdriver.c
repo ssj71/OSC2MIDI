@@ -285,14 +285,14 @@ queue_message(jack_ringbuffer_t* ringbuffer, struct MidiMessage *ev)
 	int written;
 
 	if (jack_ringbuffer_write_space(ringbuffer) < sizeof(*ev)) {
-		printf("Not enough space in the ringbuffer, NOTE LOST.");
+		printf("Not enough space in the ringbuffer, MIDI LOST.");
 		return;
 	}
 
 	written = jack_ringbuffer_write(ringbuffer, (char *)ev, sizeof(*ev));
 
 	if (written != sizeof(*ev))
-        printf("jack_ringbuffer_write failed, NOTE LOST.");
+        printf("jack_ringbuffer_write failed, MIDI LOST.");
 }
 
 void queue_midi(void* seqq, uint8_t msg[])
@@ -305,7 +305,7 @@ void queue_midi(void* seqq, uint8_t msg[])
     ev.data[2] = msg[2];
 
     ev.time = jack_frame_time(seq->jack_client);
-    queue_message(seq->jack_ringbuffer,&ev);
+    queue_message(seq->ringbuffer,&ev);
 }
 
 void noteup_jack(void* seqq, uint8_t chan, uint8_t note, uint8_t vel)
@@ -343,10 +343,10 @@ init_jack(JACK_SEQ* seq, uint8_t verbose)
 	int err;
     
     if(verbose)printf("opening client...\n");
-    seq->jack_client = jack_client_open("Game Drumkit Client", JackNoStartServer, NULL);
+    seq->jack_client = jack_client_open("osc2midi", JackNoStartServer, NULL);
 
 	if (seq->jack_client == NULL) {
-        printf("Could not connect to the JACK server; run jackd first?");
+        printf("Could not connect to the JACK server; run jackd first?\n");
 	return 0;
 	}
 
@@ -354,7 +354,7 @@ init_jack(JACK_SEQ* seq, uint8_t verbose)
 	seq->ringbuffer = jack_ringbuffer_create(RINGBUFFER_SIZE);
 
 	if (seq->ringbuffer == NULL) {
-        printf("Cannot create JACK ringbuffer.");
+        printf("Cannot create JACK ringbuffer.\n");
 	return 0;
 	}
 
@@ -364,7 +364,7 @@ init_jack(JACK_SEQ* seq, uint8_t verbose)
     if(verbose)printf("assigning process callback...\n");
 	err = jack_set_process_callback(seq->jack_client, process_callback, (void*)seq);
 	if (err) {
-        printf("Could not register JACK process callback.");
+        printf("Could not register JACK process callback.\n");
 	return 0; 
 	}
 
@@ -372,12 +372,12 @@ init_jack(JACK_SEQ* seq, uint8_t verbose)
 		JackPortIsOutput, 0);
 
 	if (seq->output_port == NULL) {
-        printf("Could not register JACK output port.");
+        printf("Could not register JACK output port.\n");
 	return 0;
 	}
 
 	if (jack_activate(seq->jack_client)) {
-        printf("Cannot activate JACK client.");
+        printf("Cannot activate JACK client.\n");
 	return 0;
 	}
 	return 1;

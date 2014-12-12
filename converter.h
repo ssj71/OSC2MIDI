@@ -17,6 +17,6 @@ typedef struct _CONVERTER
     uint16_t npairs;
     PAIRHANDLE* p;
 
-    //jack ringbuffer probably
+    void * seq;
 } CONVERTER;
 #endif

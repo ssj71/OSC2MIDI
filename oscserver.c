@@ -74,17 +74,18 @@ int mon_handler(const char *path, const char *types, lo_arg ** argv,
     return 1;
 }
 
+//this handles the osc to midi conversions
 int msg_handler(const char *path, const char *types, lo_arg ** argv,
                     int argc, void *data, void *user_data)
 {
-    int i,j;
+    int i,j,n;
     uint8_t first = 1;
     uint8_t midi[3];
     CONVERTER* conv = (CONVERTER*)user_data;
 
     for(j=0;j<conv->npairs;j++)
     {
-        if(try_match_osc(conv->p[j],(char *)path,(char *)types,argv,argc,&(conv->glob_chan),midi))
+        if(n = try_match_osc(conv->p[j],(char *)path,(char *)types,argv,argc,&(conv->glob_chan),midi))
         {
             if(!conv->multi_match)
                 j = conv->npairs;
@@ -106,6 +107,8 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
             }
 
             //push message onto ringbuffer (with timestamp)
+            if(n>0)
+                queue_midi(conv->seq,midi);
         }
     }
     if(conv->verbose && !first)

@@ -548,7 +548,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     p->opcode += arg[3];
 }
 
-int abort_pair_alloc(int step, PAIR* p)
+PAIRHANDLE abort_pair_alloc(int step, PAIR* p)
 {
     switch(step)
     {
@@ -589,20 +589,20 @@ PAIRHANDLE alloc_pair(char* config)
 
     //config into separate parts
     if(-1 == get_pair_path(config,p))
-        return (PAIRHANDLE)abort_pair_alloc(2,p);
+        return abort_pair_alloc(2,p);
 
 
     if(-1 == get_pair_argtypes(config,p))
-        return (PAIRHANDLE)abort_pair_alloc(3,p);
+        return abort_pair_alloc(3,p);
 
 
     n = get_pair_midicommand(config,p);
     if(-1 == n)
-        return (PAIRHANDLE)abort_pair_alloc(3,p);
+        return abort_pair_alloc(3,p);
 
 
     if(-1 == get_pair_mapping(config,p,n))
-        return (PAIRHANDLE)abort_pair_alloc(3,p);
+        return abort_pair_alloc(3,p);
 
     return p;//success
 }

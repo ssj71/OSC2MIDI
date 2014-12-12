@@ -10,6 +10,7 @@
 #include"pair.h"
 #include"oscserver.h"
 #include"converter.h"
+#include"jackdriver.h"
 
 int is_empty(const char *s) 
 {
@@ -21,6 +22,85 @@ int is_empty(const char *s)
     }
     return 1;
 }
+
+int load_map(CONVERTER* conv, char* path, char* file)
+{
+    int i;
+    char line[400];
+    FILE* map;
+    PAIRHANDLE *p;
+
+    //try to load the file:
+    if(file[0] == '/')
+    {
+        //absolute path
+        map = fopen(file,"r");
+        if(!map)
+        {
+            printf("Error opening map file! %s",file);
+            fflush(stdout);
+            printf("\b\b\b\n");
+            return -1;
+        }
+        if(conv->verbose)
+            printf("Using map file %s\n",file);
+    }
+    else 
+    {
+        map = fopen(strcat(path,file),"r");
+        if(!map)
+        {
+            map = fopen(strcat(path,".omm"),"r");
+        }
+        if(!map)
+        {
+            printf("Error opening map file! %s",path);
+            fflush(stdout);
+            printf("\b\b\b\n");
+            return -1;
+        }
+        if(conv->verbose)
+            printf("Using map file %s\n",path);
+    }
+
+    //count how many lines there are
+    i=0;
+    while(!feof(map))
+    {
+        fgets(line,400,map);
+        if(!sscanf(line,"%[ \t#]",file))
+            i++;//line is not commented out
+    }
+
+    p = (PAIRHANDLE)malloc(sizeof(PAIRHANDLE)*i);
+    rewind(map);
+    i=0;
+    while(!feof(map))
+    {
+        fgets(line,400,map);
+        if(!sscanf(line,"%[ \t#]",file) && !is_empty(line))
+        {
+            p[i] = alloc_pair(line);
+            if(p[i++])
+            {
+                if(conv->verbose)
+                {
+                    printf("pair created: ");
+                    print_pair(p[i-1]);
+                }
+            }
+            else
+                i--;//error message will be printed by alloc_pair
+        }
+    }
+    if(conv->verbose)
+    {
+        printf("%i pairs created.\n ",i-1);
+    }
+    conv->npairs = i-1;
+    conv->p = p;
+    return i-1;
+} 
 
 void useage()
 {
@@ -55,14 +135,13 @@ void useage()
 int main(int argc, char** argv)
 {
 
-    FILE* map;
-    char line[400], path[200],s[200], port[200], addr[200];
+    char path[200],file[200], port[200], addr[200];
     int i;
-    PAIRHANDLE *p;
     CONVERTER conv;
+    JACK_SEQ seq;
 
     //defaults
-    strcpy(s,"default.omm");
+    strcpy(file,"default.omm");
     strcpy(path,getenv("HOME"));
     strcat(path,"/.osc2midi/");
     strcpy(port,"57120");
@@ -92,7 +171,7 @@ int main(int argc, char** argv)
         else if (strcmp(argv[i], "-map") == 0) 
         {
             //load map file
-            strcpy(s,argv[++i]);
+            strcpy(file,argv[++i]);
         }
         else if(strcmp(argv[i], "-mon") ==0)
         {
@@ -102,7 +181,7 @@ int main(int argc, char** argv)
         else if (strcmp(argv[i], "-m") == 0) 
         {
             //load map file
-            strcpy(s,argv[++i]);
+            strcpy(file,argv[++i]);
         }
         else if(strcmp(argv[i], "-p") ==0)
         {
@@ -133,75 +212,8 @@ int main(int argc, char** argv)
 
     if(!conv.mon_mode)
     {
-        //try to load the file:
-        if(s[0] == '/')
-        {
-            //absolute path
-            map = fopen(s,"r");
-            if(!map)
-            {
-                printf("Error opening map file! %s",s);
-                fflush(stdout);
-                printf("\b\b\b\n");
-                return -1;
-            }
-            if(conv.verbose)
-                printf("Using map file %s\n",s);
-        }
-        else 
-        {
-            map = fopen(strcat(path,s),"r");
-            if(!map)
-            {
-                map = fopen(strcat(path,".omm"),"r");
-            }
-            if(!map)
-            {
-                printf("Error opening map file! %s",path);
-                fflush(stdout);
-                printf("\b\b\b\n");
-                return -1;
-            }
-            if(conv.verbose)
-                printf("Using map file %s\n",path);
-        }
-
-        //count how many lines there are
-        i=0;
-        while(!feof(map))
-        {
-            fgets(line,400,map);
-            if(!sscanf(line,"%[ \t#]",s))
-                i++;//line is not commented out
-        }
-
-        p = (PAIRHANDLE)malloc(sizeof(PAIRHANDLE)*i);
-        rewind(map);
-        i=0;
-        while(!feof(map))
-        {
-            fgets(line,400,map);
-            if(!sscanf(line,"%[ \t#]",s) && !is_empty(line))
-            {
-                p[i] = alloc_pair(line);
-                if(p[i++])
-                {
-                    if(conv.verbose)
-                    {
-                        printf("pair created: ");
-                        print_pair(p[i-1]);
-                    }
-                }
-                else
-                    i--;//error message will be printed by alloc_pair
-            }
-        }
-        if(conv.verbose)
-        {
-            printf("%i pairs created.\n ",i-1);
-        }
-        conv.npairs = i-1;
-        conv.p = p;
+        if(load_map(&conv,path,file) == -1)
+            return -1;
     }
     else if(conv.verbose)
         printf("Monitor mode, OSC messages will only be printed.\n");
@@ -209,10 +221,25 @@ int main(int argc, char** argv)
     //start the server
     lo_server_thread st;
     st = start_osc_server(port,&conv);
+    
+    //start JACK client
+    if(!conv.mon_mode)
+    {
+        if(!init_jack(&seq,conv.verbose))
+        {
+            printf("JACK connection failed");
+            return -1;
+        }
+        conv.seq = (void*)&seq;
+    }
 
     while(1)
     {
         usleep(1000);
     }
+
+    //stop everything
+    close_jack(&conv.seq);
     stop_osc_server(st);
+    return 0;
 }

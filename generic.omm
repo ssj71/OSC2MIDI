@@ -5,55 +5,23 @@
 # back. Each uncommented line follows the form:
 #        [OscPath] [ArgTypes], [ArgName1], [ArgName2], ..., [ArgNameN] : [MIDIFUNCTION](args);
 
-# more info is below the actual configuration specified in this file. This  
-# mapping works with all the default interfaces that come with control
+# more info is below the actual configuration specified in this file. This file 
+# is specifically for the default Control templates also included in this repo.
 
- # multitouch
-/multi/{i} ff, touch,x,y : controlchange( channel, touch, x*127);
-/multi/{i} ff, touch,x,y : controlchange( channel, touch+10, y*127);
- # mixer
-/pan{i} i, cc,val  : controlchange( channel, cc*4, val*63.5 + 63.5);
-/mute{i} i, cc,val : controlchange( channel, cc*4+1, val*127);
-/solo{i} i, cc,val : controlchange( channel, cc*4+2, val*127);
-/vol{i} f, cc,val  : controlchange( channel, cc*4+3, val*127);
- # DJ
-/leftHighCut i, val : controlchange( channel, 1, val);
-/leftMidCut i, val : controlchange( channel, 2, val);
-/leftLowCut i, val : controlchange( channel, 3, val);
-/leftVolume f, val : controlchange( channel, 4, val);
-/leftMulti{i} f, indx,val : controlchange( channel, 5+indx, val);
-/leftCue i, val : controlchange( channel, 9, val);
-/crossfader f, val : controlchange( channel, 10, val);
-/crossfader i, val : controlchange( channel, 10, val);
-/rightHighCut i, val : controlchange( channel, 11, val);
-/rightMidCut i, val : controlchange( channel, 12, val);
-/rightLowCut i, val : controlchange( channel, 13, val);
-/rightVolume f, val : controlchange( channel, 14, val);
-/rightMulti{i} f, indx,val : controlchange( channel, 15+indx, val);
-/rightCue i, val : controlchange( channel, 19, val);
- # conways game of life
-/life/{i} i, note, val : note( channel, note+7,120, val);
- # monome
-/slider{i} f, indx,val : controlchange( channel, indx, val);
-/mlr/press iii, x,y,val : note( channel, x*2+54, 100, val);
-/mlr/press iii, x,y,val : note( channel, y*4+48, 100, val);
- # multibutton
-/multi/{i} i, indx,val : note( channel, 108-11*indx/8, 100, val);
- # sequencer
-/sliders{i}/{i} f, cc,step,val : controlchange( channel, cc, val);
-/grid/{i} i, button,state : note( channel, 84-button/32, 100, state);
- # accelerometer
-/accelerometer fff, x,y,z : controlchange( channel, 1, x);
-/accelerometer fff, x,y,z : controlchange( channel, 2, y);
-/accelerometer fff, x,y,z : controlchange( channel, 3, z);
 
+/midi/cc{i} f, ctl, val   : controlchange( channel, ctl, val/127 );
+/midi/pc f, pgm           : programchange( channel, pgm );  
+/midi/pitch f, bend       : pitchbend( channel, bend*8192 );
+/midi/noteon{i} i, n,vel  : noteon( channel, n, vel);
+/midi/noteoff{i} i, n,vel : noteon( channel, n, vel );
+/chan i,c                 : setchannel( c )
 
 
 
 
 
 # The first thing to note is that you can pass arguments through the OSC message
-# path. The character sequence "{i}" indicates an integer in the path. This allows you to 
+# path. The sequence "{i}" indicates an integer in the path. This allows you to 
 # map many things quicky. For example rather than type out 127 mappings to include each
 # control number, you just pull the index of the controller out of the path. This
 # makes the first [ArgName] (i.e. "ctl" above) actually in the path rather than
@@ -110,4 +78,4 @@
 #  setchannel( channelNumber );  # set the global channel
 
 # If you make a mapping file that others could find useful please submit it and I
-# will add it to the files provided by the project
+# will include it with the source.
