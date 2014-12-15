@@ -116,6 +116,7 @@ void useage()
     printf("    -m <value>     set mapping file by name or path\n");
     printf("    -a <value>     address of OSC client for midi->OSC\n");
     printf("    -c <value>     set default MIDI channel\n");
+    printf("    -vel <value>   set default MIDI note velocity\n");
     printf("    -multi         multi mode (check all mappings/send multiple messages)\n");
     printf("    -single        multi mode off (stop checks after first match)\n");
     printf("    -mon           only print OSC messages that come into the port\n");
@@ -150,15 +151,12 @@ int main(int argc, char** argv)
     conv.mon_mode = 0;
     conv.multi_match = 1;
     conv.glob_chan = 0;
+    conv.glob_vel = 100;
     if(argc>1)
     {
     for (i = 1;i<argc;i++)
     {
-        if (strcmp(argv[i], "-v") == 0) 
-        {
-             conv.verbose = 1;
-        }
-        else if(strcmp(argv[i], "-single") ==0)
+        if(strcmp(argv[i], "-single") ==0)
         {
             //monitor mode (osc messages)
             conv.multi_match = 0;
@@ -185,15 +183,27 @@ int main(int argc, char** argv)
         }
         else if(strcmp(argv[i], "-p") ==0)
         {
+            //set osc server port
             strcpy(port,argv[++i]);
         }
         else if(strcmp(argv[i], "-a") ==0)
         {
+            //osc client address to send return osc messaged so
             strcpy(addr,argv[++i]);
         }
         else if(strcmp(argv[i], "-c") ==0)
         {
+            // global channel
             conv.glob_chan = atoi(argv[++i]);
+        }
+        else if(strcmp(argv[i], "-vel") ==0)
+        {
+            // global channel
+            conv.glob_vel = atoi(argv[++i]);
+        }
+        else if (strcmp(argv[i], "-v") == 0) 
+        {
+             conv.verbose = 1;
         }
         else if (strcmp(argv[i], "-h") == 0) 
         {
@@ -239,7 +249,7 @@ int main(int argc, char** argv)
     }
 
     //stop everything
-    close_jack(&conv.seq);
+    close_jack(&seq);
     stop_osc_server(st);
     return 0;
 }

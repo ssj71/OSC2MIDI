@@ -32,16 +32,17 @@
 /rightMulti{i} f, indx,val : controlchange( channel, 15+indx, val);
 /rightCue i, val : controlchange( channel, 19, val);
  # conways game of life
-/life/{i} i, note, val : note( channel, 127-note,120, val);
+/life/{i} i, note, val : note( channel, 127-note,velocity, val);
  # monome
 /slider{i} f, indx,val : controlchange( channel, indx, val);
-/mlr/press iii, x,y,val : note( channel, x*2+54, 100, val);
-/mlr/press iii, x,y,val : note( channel, y*4+48, 100, val);
+/mlr/press iii, x,y,val : note( channel, x*2+54, velocity, val);
+/mlr/press iii, x,y,val : note( channel, y*4+48, velocity, val);
  # multibutton
 /multi/{i} i, indx,val : note( channel, 108-11*indx/8, 100, val);
  # sequencer
+/sliders0/{i} f, step,val : setvelocity( val );
 /sliders{i}/{i} f, cc,step,val : controlchange( channel, cc, val);
-/grid/{i} i, button,state : note( channel, 84-button/32, 100, state);
+/grid/{i} i, button,state : note( channel, 84-button/32, velocity, state);
  # accelerometer
 /accelerometer fff, x,y,z : controlchange( channel, 1, x);
 /accelerometer fff, x,y,z : controlchange( channel, 2, y);
@@ -63,19 +64,20 @@
 # This could of course be accomplished through sending 2 arguments, but doing so
 # isn't as simple when designing a Control template. Both ways are fully supported.
 
-# The next thing to note is that "channel" is a keyword and shall not be used
-# as an OSC argument name. This keyword indicates that the global channel set in
+# The next thing to note is that "channel" and velocity are keywords and shall not be used
+# as OSC argument names. The channel keyword indicates that the global channel set in
 # osc2midi through the command line option -c <0-15> will be used in this 
-# part of the midi command. This again allows easy specification of the channel
+# part of the midi command. This allows easy specification of the channel
 # but also great flexibility if one would not like every action to be on the 
-# global channel.
+# global channel. The keyword velocity can similarly be set with option -vel <0-127>
+# This value is only useful for note on and off messages.
 
 # The global channel can be controlled through OSC by mapping an arbitrary
 # OSC path to execute the function setchannel() rather than one of the 
-# midi functions.
+# midi functions. The parallel for velopcity is setvelocity()
 
-# Naturally, the global channel doesn't have to be used at all. You could
-# specify the channel through an argument or the OSC path. i.e.
+# Naturally, the global channel or velocity doesn't have to be used at all. You could
+# specify these values in each message through an argument or the OSC path. i.e.
 #  /m/chan{i}/controlchange{i} i, chan,ctl,val : controlchange(chan,ctl,val);
 # or even
 #  /supercontroller d f h, ctl,value,grapefruit : controlchange(grapefruit,ctl,value);

@@ -85,7 +85,7 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
 
     for(j=0;j<conv->npairs;j++)
     {
-        if(n = try_match_osc(conv->p[j],(char *)path,(char *)types,argv,argc,&(conv->glob_chan),midi))
+        if(n = try_match_osc(conv->p[j],(char *)path,(char *)types,argv,argc,&(conv->glob_chan),&(conv->glob_vel),midi))
         {
             if(!conv->multi_match)
                 j = conv->npairs;

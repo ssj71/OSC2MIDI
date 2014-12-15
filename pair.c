@@ -27,6 +27,8 @@ typedef struct _PAIR
     //uint8_t *glob_chan;//pointer to global channel
     uint8_t use_glob_chan;//flag decides if using global channel (1) or if its specified by message (0)
     uint8_t set_channel;//flag if message is actually control message to change global channel
+    uint8_t use_glob_vel;//flag decides if using global velocity (1) or if its specified by message (0)
+    uint8_t set_velocity;//flag if message is actually control message to change global velocity
     uint8_t raw_midi;//flag if message sends osc datatype of midi message
 
     //midi data
@@ -66,7 +68,7 @@ void print_pair(PAIRHANDLE ph)
     }
     
     //command
-    printf("\b\b\b : %s",opcode2cmd(p->opcode, 0));
+    printf("\b\b : %s",opcode2cmd(p->opcode, 0));
     if(p->opcode==0x80)
     {
         //check if 4 arguments
@@ -80,20 +82,22 @@ void print_pair(PAIRHANDLE ph)
     if(p->use_glob_chan)
         printf(" channel");
 
-    //midi arg 0
+    //midi arg 0 
     if(p->channel)printf(" %i",p->channel);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=0;i++);
     if(i<p->argc+p->argc_in_path)
         printf("%.2f*%c + %.2f",p->scale[0],'a'+i,p->offset[0]);
     
     
-    //midi arg1
+    //midi arg1 
     if(p->data1)printf(", %i",p->data1);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=1;i++);
     if(i<p->argc+p->argc_in_path)
         printf(", %.2f*%c + %.2f",p->scale[1],'a'+i,p->offset[1]);
     
     //midi arg2
+    if(p->use_glob_vel)
+        printf(", velocity");
     if(p->data2)printf(", %i",p->data2);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=2;i++);
     if(i<p->argc+p->argc_in_path)
@@ -330,10 +334,17 @@ int get_pair_midicommand(char* config, PAIR* p)
         n = 1;
         p->set_channel = 1;
     }
-    else if(strstr(midicommand,"setshift"))
+    else if(strstr(midicommand,"setvelocity"))
     {
         p->opcode = 0x03;
         p->channel = 0xFD;
+        n = 1;
+        p->set_velocity = 1;
+    }
+    else if(strstr(midicommand,"setshift"))
+    {
+        p->opcode = 0x04;
+        p->channel = 0xFC;
         n = 1;
     }
     else
@@ -417,6 +428,13 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             if(!strncmp(var,"channel",7))
             {
                 p->use_glob_chan = 1;
+                p->scale[i] = 1;
+                p->offset[i] = 0;
+                arg[i] = 0;
+            }
+            else if(!strncmp(var,"velocity",8))
+            {
+                p->use_glob_vel = 1;
                 p->scale[i] = 1;
                 p->offset[i] = 0;
                 arg[i] = 0;
@@ -622,7 +640,7 @@ int free_pair(PAIRHANDLE ph)
 }
 
 //returns 1 if match is successful and msg has a message to be sent to the output
-int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int argc,uint8_t* glob_chan, uint8_t msg[])
+int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int argc, uint8_t* glob_chan, uint8_t* glob_vel, uint8_t msg[])
 {
     PAIR* p = (PAIR*)ph;
     //check the easy things first
@@ -643,6 +661,10 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
     if(p->use_glob_chan)
     {
         msg[0] += *glob_chan;
+    }
+    if(p->use_glob_vel)
+    {
+        msg[2] += *glob_vel;
     }
 
     //now start trying to get the data
@@ -743,8 +765,13 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
             if(p->set_channel)
             {
                 *glob_chan = (uint8_t)val;
-                return 0;//not an error but don't need to send a midi message
+                return -1;//not an error but don't need to send a midi message (ret 0 for error)
             }   
+            else if(p->set_velocity)
+            {
+                *glob_vel = (uint8_t)val;
+                return -1;
+            }
             if(place == 3)//only used for note on or off
             {
                 msg[0] += ((uint8_t)(p->scale[place]*val + p->offset[place])>0)<<4;
@@ -790,6 +817,8 @@ char * opcode2cmd(uint8_t opcode, uint8_t noteoff)
         case 0x02:
             return "setchannel";
         case 0x03:
+            return "setvelocity";
+        case 0x04:
             return "setshift";
         default:
             return "unknown";
