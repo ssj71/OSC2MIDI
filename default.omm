@@ -32,7 +32,7 @@
 /rightMulti{i} f, indx,val : controlchange( channel, 15+indx, val);
 /rightCue i, val : controlchange( channel, 19, val);
  # conways game of life
-/life/{i} i, note, val : note( channel, note+7,120, val);
+/life/{i} i, note, val : note( channel, 127-note,120, val);
  # monome
 /slider{i} f, indx,val : controlchange( channel, indx, val);
 /mlr/press iii, x,y,val : note( channel, x*2+54, 100, val);
