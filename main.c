@@ -7,10 +7,18 @@
 #include<stdio.h>
 #include<stdint.h>
 #include<string.h>
+#include<signal.h>
 #include"pair.h"
 #include"oscserver.h"
 #include"converter.h"
 #include"jackdriver.h"
+
+uint8_t quit = 0;
+
+void quitter(int sig)
+{
+    quit = 1;
+}
 
 int is_empty(const char *s) 
 {
@@ -135,7 +143,6 @@ void useage()
 
 int main(int argc, char** argv)
 {
-
     char path[200],file[200], port[200], addr[200];
     int i;
     CONVERTER conv;
@@ -243,13 +250,21 @@ int main(int argc, char** argv)
         conv.seq = (void*)&seq;
     }
 
-    while(1)
+    signal(SIGINT, quitter);
+    while(!quit)
     {
         usleep(1000);
     }
 
     //stop everything
-    close_jack(&seq);
+    if(!conv.mon_mode)
+    {
+        if(conv.verbose)
+            printf("closing jack\n");
+        close_jack(&seq);
+    }
+    if(conv.verbose)
+        printf("closing osc server\n");
     stop_osc_server(st);
     return 0;
 }
