@@ -260,11 +260,11 @@ int main(int argc, char** argv)
     if(!conv.mon_mode)
     {
         if(conv.verbose)
-            printf("closing jack\n");
+            printf("\nclosing jack");
         close_jack(&seq);
     }
     if(conv.verbose)
-        printf("closing osc server\n");
+        printf("\nclosing osc server\n");
     stop_osc_server(st);
     return 0;
 }
