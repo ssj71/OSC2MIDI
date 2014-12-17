@@ -12,7 +12,7 @@
 /multi/{i} ff, touch,x,y : controlchange( channel, touch, x*127);
 /multi/{i} ff, touch,x,y : controlchange( channel, touch+10, y*127);
  # mixer
-/pan{i} i, cc,val  : controlchange( channel, cc*4, val*63.5 + 63.5);
+/pan{i} f, cc,val  : controlchange( channel, cc*4, val*63.5 + 63.5);
 /mute{i} i, cc,val : controlchange( channel, cc*4+1, val*127);
 /solo{i} i, cc,val : controlchange( channel, cc*4+2, val*127);
 /vol{i} f, cc,val  : controlchange( channel, cc*4+3, val*127);

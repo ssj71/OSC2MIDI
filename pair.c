@@ -24,7 +24,8 @@ typedef struct _PAIR
     int8_t* map;//which byte in the midi message by index of var in OSC message (including in path args)
     float scale[4];//scale factor for each argument going into the midi message
     float offset[4];//linear offset for each arg going to midi message
-    //uint8_t *glob_chan;//pointer to global channel
+
+    //flags
     uint8_t use_glob_chan;//flag decides if using global channel (1) or if its specified by message (0)
     uint8_t set_channel;//flag if message is actually control message to change global channel
     uint8_t use_glob_vel;//flag decides if using global velocity (1) or if its specified by message (0)
@@ -668,17 +669,18 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
     }
 
     //now start trying to get the data
-    int i,v;
+    int i,v,n;
     char *tmp;
     int place;
     for(i=0;i<p->argc_in_path;i++)
     {
-  
         //does it match?
         p->path[i][p->perc[i]] = 0;
         tmp = strstr(path,p->path[i]);  
+        n = strlen(p->path[i]);
         p->path[i][p->perc[i]] = '%';
-        if(!tmp)
+        //if(!tmp || strncmp(tmp,p->path[i],n))
+        if( !tmp )
         {
             return 0;
         }
@@ -697,12 +699,24 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                 msg[place+1] += (uint8_t)((p->scale[place]*v + p->offset[place])/128.0); 
             }
         }
+        //path = tmp;
     }
     //compare the end of the path
-    if(!strstr(path,p->path[i]))
+    n = strlen(p->path[i]);
+    if(n)
     {
-        return 0;
+        tmp = strstr(path,p->path[i]);
+        if( !tmp) //tmp !=path );
+        {
+            return 0;
+        } 
+        if(strcmp(tmp,p->path[i]))
+        {
+            return 0;
+        }
     }
+    //n = strlen(p->path[i]);
+    //if(strncmp(tmp,p->path[i],n) )
 
 
     //now the actual osc args
@@ -789,7 +803,33 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
     return 1;
 }
 
-int try_match_midi(PAIRHANDLE ph, uint8_t msg[], lo_message *osc){}
+int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, lo_message *osc)
+{
+    PAIR* p = (PAIR*)ph;
+    uint8_t i,v;
+
+    //check the opcode
+    if( msg[0]&0xF0 != p->opcode )
+    {
+        if(msg[0]&0xF0 == 0x80)
+        {
+            for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=3;i++);
+            if(i<p->argc+p->argc_in_path && msg[0] != p->opcode+1)
+            {
+                
+                return 0;
+            }
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
+    //check the chanel
+    if( msg[0]&0xF0 != p->channel + p->use_glob_chan**glob_chan);
+
+}
 
 char * opcode2cmd(uint8_t opcode, uint8_t noteoff)
 {
