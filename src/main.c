@@ -122,12 +122,14 @@ void useage()
     printf("    -v             verbose mode\n");
     printf("    -p <value>     set OSC server port\n");
     printf("    -m <value>     set mapping file by name or path\n");
-    printf("    -a <value>     address of OSC client for midi->OSC\n");
+    //printf("    -a <value>     address of OSC client for midi->OSC\n");
     printf("    -c <value>     set default MIDI channel\n");
     printf("    -vel <value>   set default MIDI note velocity\n");
     printf("    -multi         multi mode (check all mappings/send multiple messages)\n");
     printf("    -single        multi mode off (stop checks after first match)\n");
-    printf("    -mon           only print OSC messages that come into the port\n");
+    //printf("    -mon           only print OSC messages that come into the port\n");
+    //printf("    -o2m           only convert OSC messages to MIDI\n");
+    printf("    -m2o           only convert MIDI messages to OSC\n");
     printf("    -h             show this message\n");
     printf("\n");
     printf("NOTES:\n");
@@ -159,6 +161,7 @@ int main(int argc, char** argv)
     conv.multi_match = 1;
     conv.glob_chan = 0;
     conv.glob_vel = 100;
+    conv.convert = 0;
     if(argc>1)
     {
     for (i = 1;i<argc;i++)
@@ -182,6 +185,16 @@ int main(int argc, char** argv)
         {
             //monitor mode (osc messages)
             conv.mon_mode = 1;
+        }
+        else if(strcmp(argv[i], "-m2o") ==0)
+        {
+            //monitor mode (osc messages)
+            conv.convert = 1;
+        }
+        else if(strcmp(argv[i], "-o2m") ==0)
+        {
+            //monitor mode (osc messages)
+            conv.o2m = -1;
         }
         else if (strcmp(argv[i], "-m") == 0) 
         {
@@ -236,8 +249,11 @@ int main(int argc, char** argv)
         printf("Monitor mode, OSC messages will only be printed.\n");
 
     //start the server
-    lo_server_thread st;
-    st = start_osc_server(port,&conv);
+    if(conv->convert > -1)
+    {
+        lo_server_thread st;
+        st = start_osc_server(port,&conv);
+    }
     
     //start JACK client
     if(!conv.mon_mode)
@@ -263,8 +279,11 @@ int main(int argc, char** argv)
             printf("\nclosing jack");
         close_jack(&seq);
     }
-    if(conv.verbose)
-        printf("\nclosing osc server\n");
-    stop_osc_server(st);
+    if(conv->convert > -1)
+    {
+        if(conv.verbose)
+            printf("\nclosing osc server\n");
+        stop_osc_server(st);
+    }
     return 0;
 }
