@@ -194,7 +194,7 @@ int main(int argc, char** argv)
         else if(strcmp(argv[i], "-o2m") ==0)
         {
             //monitor mode (osc messages)
-            conv.o2m = -1;
+            conv.convert = -1;
         }
         else if (strcmp(argv[i], "-m") == 0) 
         {
@@ -249,9 +249,9 @@ int main(int argc, char** argv)
         printf("Monitor mode, OSC messages will only be printed.\n");
 
     //start the server
-    if(conv->convert > -1)
+    lo_server_thread st;
+    if(conv.convert > -1)
     {
-        lo_server_thread st;
         st = start_osc_server(port,&conv);
     }
     
@@ -279,7 +279,7 @@ int main(int argc, char** argv)
             printf("\nclosing jack");
         close_jack(&seq);
     }
-    if(conv->convert > -1)
+    if(conv.convert > -1)
     {
         if(conv.verbose)
             printf("\nclosing osc server\n");
