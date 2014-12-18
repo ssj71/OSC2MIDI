@@ -1,0 +1,7 @@
+#this mapping works with all the default widgets in androsc
+
+/vslider f, a : controlchange( channel, 1, a );
+/hslider f, a : controlchange( channel, 2, a );
+button i, a : controlchange( channel, 5, a );
+/pad ff, a,b : controlchange( channel, 3, a );
+/pad ff, a,b : controlchange( channel, 4, b );
