@@ -4,7 +4,7 @@
 /multi/{i} ff, touch,x,y : controlchange( channel, touch, x*127);
 /multi/{i} ff, touch,x,y : controlchange( channel, touch+10, y*127);
  # mixer
-/pan{i} i, cc,val  : controlchange( channel, cc*4, val*63.5 + 63.5);
+/pan{i} f, cc,val  : controlchange( channel, cc*4, val*63.5 + 63.5);
 /mute{i} i, cc,val : controlchange( channel, cc*4+1, val*127);
 /solo{i} i, cc,val : controlchange( channel, cc*4+2, val*127);
 /vol{i} f, cc,val  : controlchange( channel, cc*4+3, val*127);
@@ -24,18 +24,18 @@
 /rightMulti{i} f, indx,val : controlchange( channel, 15+indx, val);
 /rightCue i, val : controlchange( channel, 19, val);
  # conways game of life
-/life/{i} i, note, val : note( channel, note+7,120, val);
+/life/{i} i, note, val : note( channel, 127-note,velocity, val);
  # monome
 /slider{i} f, indx,val : controlchange( channel, indx, val);
-/mlr/press iii, x,y,val : note( channel, x*2+54, 100, val);
-/mlr/press iii, x,y,val : note( channel, y*4+48, 100, val);
+/mlr/press iii, x,y,val : note( channel, x*2+54, velocity, val);
+/mlr/press iii, x,y,val : note( channel, y*4+48, velocity, val);
  # multibutton
 /multi/{i} i, indx,val : note( channel, 108-11*indx/8, 100, val);
  # sequencer
+/sliders0/{i} f, step,val : setvelocity( val );
 /sliders{i}/{i} f, cc,step,val : controlchange( channel, cc, val);
-/grid/{i} i, button,state : note( channel, 84-button/32, 100, state);
+/grid/{i} i, button,state : note( channel, 84-button/32, velocity, state);
  # accelerometer
 /accelerometer fff, x,y,z : controlchange( channel, 1, x);
 /accelerometer fff, x,y,z : controlchange( channel, 2, y);
-/accelerometer fff, x,y,z : controlchange( channel, 3, z);
-
+/accelerometer fff, x,y,z : controlchange( channel, 3, z); 
