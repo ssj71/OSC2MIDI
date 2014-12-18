@@ -16,7 +16,7 @@ This project uses cmake. The easiest and safest way to install is to do the foll
   sudo make install
 
 If you are missing anything cmake will tell you. Mostly you will just need cmake, liblo and jack.
-On ubuntu just run
+To get these on ubuntu just run
   sudo apt-get install cmake liblo-dev libjack-dev
 
 Once installed you can simply run with the command

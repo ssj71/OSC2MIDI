@@ -127,9 +127,9 @@ void useage()
     printf("    -vel <value>   set default MIDI note velocity\n");
     printf("    -multi         multi mode (check all mappings/send multiple messages)\n");
     printf("    -single        multi mode off (stop checks after first match)\n");
-    //printf("    -mon           only print OSC messages that come into the port\n");
+    printf("    -mon           only print OSC messages that come into the port\n");
     //printf("    -o2m           only convert OSC messages to MIDI\n");
-    printf("    -m2o           only convert MIDI messages to OSC\n");
+    //printf("    -m2o           only convert MIDI messages to OSC\n");
     printf("    -h             show this message\n");
     printf("\n");
     printf("NOTES:\n");
