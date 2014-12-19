@@ -2,11 +2,8 @@ loadedInterfaceName = "generic synth (phone)";
 
 interfaceOrientation = "landscape";
 
-function oct(dir)//int dir)
+function oct(dir)
 {
-    //octSlider.setValue(dir);
-    //octLabel.setValue(dir);
-    
     if(dir == 1 && octSlider.value < 4)
     {
         octSlider.setValue(octSlider.value +1);
@@ -14,6 +11,10 @@ function oct(dir)//int dir)
     else if(dir == -1 && octSlider.value > -4)
     {
         octSlider.setValue(octSlider.value -1);
+    }
+    else if(dir == 0)
+    {
+        octSlider.setValue(0);
     }
    
     switch(octSlider.value)
@@ -71,15 +72,15 @@ control.octave = oct;
 
 pages = [[
 {
-    "name": "refresh",
+    "name": "reset",
     "type": "Button",
     "bounds": [.6, .9, .14, .1],
     "startingValue": 0,
     "isLocal": true,
     "mode": "contact",
-    "ontouchstart": "interfaceManager.refreshInterface()",
+    "ontouchstart": "control.octave(0)",
     "stroke": "#aaa",
-    "label": "refrsh",
+    "label": "reset",
 },
 {
     "name": "tabButton",
@@ -92,6 +93,7 @@ pages = [[
     "label": "menu",
 },
 
+//pitch and mod wheel
 {
     "name" : "pitchSlider",
     "type" : "Slider",
@@ -114,6 +116,7 @@ pages = [[
     "isXFader" : false,
 },
 
+//other ccs
 {
     "name" : "cc2Slider",
     "type" : "Slider",
@@ -155,11 +158,13 @@ pages = [[
     "isXFader" : false,
 },
 
+//Octave
 {
     "name" : "octLabel",
     "type" : "Label",
     "bounds": [.6, .75, 0.14, 0.15], 
     "value" : "0",
+    "size" : "32"
 },
 {
     "name" : "octSlider",
