@@ -827,7 +827,11 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, lo_message 
     }
 
     //check the chanel
-    if( msg[0]&0xF0 != p->channel + p->use_glob_chan**glob_chan);
+    if( msg[0]&0xF0 != p->channel + p->use_glob_chan**glob_chan)
+    {
+        return 0;
+    }
+    
 
 }
 
