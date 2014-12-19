@@ -273,16 +273,17 @@ int main(int argc, char** argv)
     }
 
     //stop everything
+    printf("/nquitting...\n");
     if(!conv.mon_mode)
     {
         if(conv.verbose)
-            printf("\nclosing jack");
+            printf(" closing jack\n");
         close_jack(&seq);
     }
     if(conv.convert > -1)
     {
         if(conv.verbose)
-            printf("\nclosing osc server\n");
+            printf(" closing osc server\n");
         stop_osc_server(st);
     }
     return 0;
