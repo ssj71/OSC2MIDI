@@ -195,6 +195,10 @@ nframes_to_ms(jack_client_t* jack_client,jack_nframes_t nframes)
 }
 
 void
+process_midi_input(JACK_SEQ* seq,jack_nframes_t nframes)
+void
+process_midi_thru(JACK_SEQ* seq,jack_nframes_t nframes)
+void
 process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 {
 	int read, t, bytes_remaining;
@@ -259,6 +263,8 @@ process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 	}
 }
 
+// in, i+o, i+o+t, o+t, o
+
 int 
 process_callback(jack_nframes_t nframes, void *seqq)
 {
@@ -268,7 +274,12 @@ process_callback(jack_nframes_t nframes, void *seqq)
 		printf("Had to wait too long for JACK callback; scheduling problem?");
 #endif
 
-	process_midi_output( seq,nframes);
+    if(seq->usein)
+        process_midi_input( seq,nframes );
+    if(seq->usethru)
+        process_midi_thru( seq,nframes );
+    if(seq->useout)
+        process_midi_output( seq,nframes );
 
 #ifdef MEASURE_TIME
 	if (get_delta_time() > MAX_PROCESSING_TIME)

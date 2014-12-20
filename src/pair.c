@@ -31,6 +31,7 @@ typedef struct _PAIR
     uint8_t use_glob_vel;//flag decides if using global velocity (1) or if its specified by message (0)
     uint8_t set_velocity;//flag if message is actually control message to change global velocity
     uint8_t raw_midi;//flag if message sends osc datatype of midi message
+    uint8_t use[3];//flags for midi message (channel, data1, data2)
 
     //midi data
     uint8_t opcode;
@@ -84,14 +85,14 @@ void print_pair(PAIRHANDLE ph)
         printf(" channel");
 
     //midi arg 0 
-    if(p->channel)printf(" %i",p->channel);
+    if(p->use[0])printf(" %i",p->channel);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=0;i++);
     if(i<p->argc+p->argc_in_path)
         printf("%.2f*%c + %.2f",p->scale[0],'a'+i,p->offset[0]);
     
     
     //midi arg1 
-    if(p->data1)printf(", %i",p->data1);
+    if(p->use[1])printf(", %i",p->data1);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=1;i++);
     if(i<p->argc+p->argc_in_path)
         printf(", %.2f*%c + %.2f",p->scale[1],'a'+i,p->offset[1]);
@@ -99,7 +100,7 @@ void print_pair(PAIRHANDLE ph)
     //midi arg2
     if(p->use_glob_vel)
         printf(", velocity");
-    if(p->data2)printf(", %i",p->data2);
+    if(p->use[2])printf(", %i",p->data2);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=2;i++);
     if(i<p->argc+p->argc_in_path)
         printf(", %.2f*%c + %.2f",p->scale[2],'a'+i,p->offset[2]);
@@ -159,7 +160,7 @@ int get_pair_path(char* config, PAIR* p)
     prev = path;
     tmp = path;
     i = 1;
-    while(tmp = strchr(tmp,'{'))
+    while( (tmp = strchr(tmp,'{')) )
     {
         i++;
         tmp++;
@@ -167,13 +168,13 @@ int get_pair_path(char* config, PAIR* p)
     p->path = (char**)malloc(sizeof(char*)*i);
     p->perc = (int*)malloc(sizeof(int)*(i-1));
     //now break it up into chunks
-    while(tmp = strchr(prev,'{'))
+    while( (tmp = strchr(prev,'{')) )
     {
         //get size of this part of path and allocate a string
         n = tmp - prev;
         i = 0;
         tmp = prev;
-        while(tmp = strchr(tmp,'%')) i++;
+        while( (tmp = strchr(tmp,'%')) ) i++;
         p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*n+i+3);
         //double check the variable is good
         i = sscanf(prev,"%*[^{]{%[^}]}",var);
@@ -199,6 +200,7 @@ int get_pair_path(char* config, PAIR* p)
     //allocate space for end of path and copy
     p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*strlen(prev));
     strcpy(p->path[p->argc_in_path],prev);
+    return 0;
 }
 
 int get_pair_argtypes(char* config, PAIR* p)
@@ -246,6 +248,7 @@ int get_pair_argtypes(char* config, PAIR* p)
     p->types[j] = 0;//null terminate. Its good practice
     for(i=0;i<strlen(argtypes)+p->argc_in_path;i++)
         p->map[j] = -1;//initialize mapping for in-path args
+    return 0;
 }
 
 int get_pair_midicommand(char* config, PAIR* p)
@@ -361,10 +364,10 @@ int get_pair_mapping(char* config, PAIR* p, int n)
 {
     char argnames[200],midiargs[200],
         arg0[70], arg1[70], arg2[70], arg3[70],
-        pre[50], var[50], post[50], work[50];
+        pre[50], var[50], post[50];
     char *tmp, *marg[4];
     float f,arg[4] = {0,0,0,0};
-    int i,j,k;
+    int i,j,k,use[4] = {0,0,0,0};
 
     arg0[0]=0;
     arg1[0]=0;
@@ -422,6 +425,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                 return -1;
             }
             arg[i] = (uint8_t)f;
+            use[i] = 1;
         }
         else//not a constant
         {
@@ -432,6 +436,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                 p->scale[i] = 1;
                 p->offset[i] = 0;
                 arg[i] = 0;
+                use[i] = 0;
             }
             else if(!strncmp(var,"velocity",8))
             {
@@ -439,6 +444,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                 p->scale[i] = 1;
                 p->offset[i] = 0;
                 arg[i] = 0;
+                use[i] = 0;
             }
             else
             {
@@ -565,6 +571,11 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     p->data1 = arg[1];
     p->data2 = arg[2];
     p->opcode += arg[3];
+    p->use[0] = use[0];
+    p->use[1] = use[1];
+    p->use[2] = use[2];
+    
+    return 0;
 }
 
 PAIRHANDLE abort_pair_alloc(int step, PAIR* p)
@@ -626,7 +637,7 @@ PAIRHANDLE alloc_pair(char* config)
     return p;//success
 }
 
-int free_pair(PAIRHANDLE ph)
+void free_pair(PAIRHANDLE ph)
 {
     PAIR* p = (PAIR*)ph;
     free(p->types);
@@ -803,36 +814,108 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
     return 1;
 }
 
-int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, lo_message *osc)
+int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path, lo_message oscm)
 {
     PAIR* p = (PAIR*)ph;
-    uint8_t i,v;
+    uint8_t i,place,m[4] = {0,0,0,0};
+    char s[2] = {0,0};
+    char chunk[100];
 
-    //check the opcode
-    if( msg[0]&0xF0 != p->opcode )
+    if(!p->raw_midi)
     {
-        if(msg[0]&0xF0 == 0x80)
+        //check the opcode
+        if( (msg[0]&0xF0) != p->opcode )
         {
-            for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=3;i++);
-            if(i<p->argc+p->argc_in_path && msg[0] != p->opcode+1)
+            if( (msg[0]&0xF0) == 0x80 )
             {
-                
+                for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=3;i++);
+                if(i<p->argc+p->argc_in_path && msg[0] != p->opcode+1)
+                {
+                    
+                    return 0;
+                }
+            }
+            else
+            {
                 return 0;
             }
         }
-        else
+
+        //check the chanel
+        if(p->use_glob_chan && (msg[0]&0x0F) != *glob_chan)
         {
             return 0;
         }
-    }
+        else if(p->use[0] && (msg[0]&0x0F) != p->channel)
+        {
+            return 0;
+        }
+        
+        if(p->use[1] && msg[1] != p->data1)
+        {
+            return 0;
+        }
 
-    //check the chanel
-    if( msg[0]&0xF0 != p->channel + p->use_glob_chan**glob_chan)
+        if(p->use[2] && msg[2] != p->data2)
+        {
+            return 0;
+        }
+
+        //looks like a match, load values
+        for(i=0;i<p->argc;i++)
+        {
+            place = p->map[i+p->argc_in_path];
+            if(place != -1)
+            {
+                s[0] = p->types[i];
+                lo_message_add( m, s, (msg[place] - p->offset[place]) / p->scale[place] );
+            }
+            else
+            {
+                s[0] = p->types[i];
+                lo_message_add(m,s,0);//we have no idea what should be in these, so just load a 0
+            }
+        }
+    }
+    else
     {
-        return 0;
+        //anything matches a raw midi
+        for(i=0;i<p->argc;i++)
+        {
+            if(p->types[i] == 'm' && p->map[i] != -1)
+            {
+                m[0] = msg[0];
+                m[1] = msg[1];
+                m[2] = msg[2];
+                m[3] = 0;//TODO I don't remember what the 4th byte is supposed to be
+                lo_message_add_midi(oscm,m);
+            }
+            else
+            {
+                s[0] = p->types[i];
+                lo_message_add(oscm,s,0);//we have no idea what should be in these, so just load a 0
+            }
+        }
     }
-    
 
+    //now the path
+    path[0] = 0;
+    for(i=0;i<p->argc_in_path;i++)
+    {
+        place = p->map[i];
+        if(p->map[place] != -1)
+        {
+            sprintf(chunk, p->path[i], (msg[place] - p->offset[place]) / p->scale[place]);
+        }
+        else
+        {
+            sprintf(chunk, p->path[i], 0);
+        }
+        strcat(path, chunk);
+    }
+    strcat(path, p->path[i]);
+    
+    return 1;
 }
 
 char * opcode2cmd(uint8_t opcode, uint8_t noteoff)

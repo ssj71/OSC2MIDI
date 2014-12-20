@@ -8,6 +8,8 @@
 #include<stdint.h>
 #include<string.h>
 #include<signal.h>
+#include<ctype.h>
+#include<unistd.h>//only for usleep
 #include"pair.h"
 #include"oscserver.h"
 #include"converter.h"
@@ -162,6 +164,9 @@ int main(int argc, char** argv)
     conv.glob_chan = 0;
     conv.glob_vel = 100;
     conv.convert = 0;
+    seq.useout = 1;
+    seq.usein = 1;
+    seq.usethru = 0;
     if(argc>1)
     {
     for (i = 1;i<argc;i++)
@@ -246,15 +251,29 @@ int main(int argc, char** argv)
             return -1;
     }
     else if(conv.verbose)
-        printf("Monitor mode, OSC messages will only be printed.\n");
+        printf("Monitor mode, incoming OSC or MIDI messages will only be printed.\n");
 
     //start the server
     lo_server_thread st;
     if(conv.convert > -1)
     {
         st = start_osc_server(port,&conv);
+        seq.useout = 1;
     }
-    
+    else
+    {
+        seq.useout = 0;
+    {
+    if(conv.convert < 1)
+    {
+        //something
+        seq.usein = 1;
+    }
+    else
+    {
+        seq.usein = 0;
+    }
+
     //start JACK client
     if(!conv.mon_mode)
     {

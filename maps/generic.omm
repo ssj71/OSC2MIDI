@@ -14,7 +14,8 @@
 /midi/pitch f, bend       : pitchbend( channel, bend*8192 );
 /midi/noteon{i} i, n,vel  : noteon( channel, n, vel);
 /midi/noteoff{i} i, n,vel : noteon( channel, n, vel );
-/chan i,c                 : setchannel( c )
+/chan i,c                 : setchannel( c );
+/octave i,o               : setoctave( o*12 );
 
 
 
