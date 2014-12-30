@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2007, 2008 Edward Tomasz Napierała <trasz@FreeBSD.org>
+ * Copyright (c) 2014 Spencer Jackson <ssjackson71@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,13 +24,6 @@
  * SUCH DAMAGE.
  */
 
-/*
- * jack-keyboard is a virtual keyboard for JACK MIDI.
- *
- * For questions and comments, you can contact:
- * - Edward Tomasz Napierala <trasz@FreeBSD.org>
- * - Hans Petter Selasky <hselasky@FreeBSD.org>.
- */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,8 +85,10 @@ double		rate_limit = 0.0;
 jack_client_t	*jack_client = NULL;
 
 
+*/
 #define MIDI_NOTE_ON		0x90
 #define MIDI_NOTE_OFF		0x80
+/*
 #define MIDI_PROGRAM_CHANGE	0xC0
 #define MIDI_CONTROLLER		0xB0
 #define MIDI_RESET		0xFF
@@ -138,6 +133,10 @@ struct MidiMessage {
 //int		channel = 0;
 
 //void draw_note(int key);
+
+///////////////////////////////////////////////
+//These functions operate in the JACK RT Thread
+///////////////////////////////////////////////
 
 double 
 get_time(void)
@@ -196,8 +195,105 @@ nframes_to_ms(jack_client_t* jack_client,jack_nframes_t nframes)
 
 void
 process_midi_input(JACK_SEQ* seq,jack_nframes_t nframes)
+{
+	int read, events, i;
+	void *port_buffer;
+    struct MidiMessage *rev;
+	jack_midi_event_t event;
+
+	port_buffer = jack_port_get_buffer(seq->input_port, nframes);
+	if (port_buffer == NULL) {
+		printf("jack_port_get_buffer failed, cannot receive anything.");
+		return;
+	}
+
+#ifdef JACK_MIDI_NEEDS_NFRAMES
+	events = jack_midi_get_event_count(port_buffer, nframes);
+#else
+	events = jack_midi_get_event_count(port_buffer);
+#endif
+
+	for (i = 0; i < events; i++) {
+
+#ifdef JACK_MIDI_NEEDS_NFRAMES
+		read = jack_midi_event_get(&event, port_buffer, i, nframes);
+#else
+		read = jack_midi_event_get(&event, port_buffer, i);
+#endif
+		if (!read) {
+			//successful event get
+
+            if (event.size <= 3 && event.size >=1) {
+                //not sysex or something
+
+                //PUSH ONTO CIRCULAR BUFFER
+                rev->len = event.size;
+                rev->time = event.time;
+                memcpy(rev->data, event.buffer, rev->len);
+                queue_message(seq->ringbuffer_in,rev);
+            }
+		}
+
+
+	}
+}
+
 void
 process_midi_thru(JACK_SEQ* seq,jack_nframes_t nframes)
+{
+	int read, events, i;
+	void *port_buffer;
+	jack_midi_event_t event;
+
+	port_buffer = jack_port_get_buffer(seq->input_port, nframes);
+	if (port_buffer == NULL) {
+		printf("jack_port_get_buffer failed, cannot receive anything.");
+		return;
+	}
+
+#ifdef JACK_MIDI_NEEDS_NFRAMES
+	events = jack_midi_get_event_count(port_buffer, nframes);
+#else
+	events = jack_midi_get_event_count(port_buffer);
+#endif
+
+	for (i = 0; i < events; i++) {
+
+#ifdef JACK_MIDI_NEEDS_NFRAMES
+		read = jack_midi_event_get(&event, port_buffer, i, nframes);
+#else
+		read = jack_midi_event_get(&event, port_buffer, i);
+#endif
+		if (!read) {
+			//successful event get
+
+            if (event.size <= 3 && event.size >=1) {
+                //not sysex or something
+                
+                if(event.buffer[0]&0xF0 == 0x80 || event.buffer[0]&0xF0 == 0x90)
+                {
+                    //note on/off event
+                    event.buffer[2] += *seq->filter;
+                }
+
+                if (event.size <= 3 && event.size >=1) {
+                //not sysex or something
+
+                //PUSH ONTO CIRCULAR BUFFER
+                //TODO: IS this threadsafe (push onto ringbuffer from both sides)?
+                rev->len = event.size;
+                rev->time = event.time;
+                memcpy(rev->data, event.buffer, rev->len);
+                queue_message(seq->ringbuffer_in,rev);
+            }
+                
+            }
+		}
+
+
+	}
+}
+
 void
 process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 {
@@ -263,7 +359,7 @@ process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 	}
 }
 
-// in, i+o, i+o+t, o+t, o
+// in, i+o, i+o+t, o+t, out
 
 int 
 process_callback(jack_nframes_t nframes, void *seqq)
@@ -289,7 +385,9 @@ process_callback(jack_nframes_t nframes, void *seqq)
 	return (0);
 }
 
-//these functions are executed in usb IRQ thread
+///////////////////////////////////////////////
+//these functions are executed in other threads
+///////////////////////////////////////////////
 void
 queue_message(jack_ringbuffer_t* ringbuffer, struct MidiMessage *ev)
 {
@@ -316,9 +414,10 @@ void queue_midi(void* seqq, uint8_t msg[])
     ev.data[2] = msg[2];
 
     ev.time = jack_frame_time(seq->jack_client);
-    queue_message(seq->ringbuffer,&ev);
+    queue_message(seq->ringbuffer_out,&ev);
 }
 
+/*
 void noteup_jack(void* seqq, uint8_t chan, uint8_t note, uint8_t vel)
 {
     struct MidiMessage ev;
@@ -346,8 +445,11 @@ void notedown_jack(void* seqq, uint8_t chan, uint8_t note, uint8_t vel)
 
     queue_message(seq->ringbuffer,&ev);
 }
+*/
 
+////////////////////////////////
 //this is run in the main thread
+////////////////////////////////
 int 
 init_jack(JACK_SEQ* seq, uint8_t verbose)
 {
@@ -361,31 +463,63 @@ init_jack(JACK_SEQ* seq, uint8_t verbose)
 	return 0;
 	}
 
-    if(verbose)printf("creating ringbuffer...\n");
-	seq->ringbuffer = jack_ringbuffer_create(RINGBUFFER_SIZE);
-
-	if (seq->ringbuffer == NULL) {
-        printf("Cannot create JACK ringbuffer.\n");
-	return 0;
-	}
-
-	jack_ringbuffer_mlock(seq->ringbuffer);
-
-
     if(verbose)printf("assigning process callback...\n");
-	err = jack_set_process_callback(seq->jack_client, process_callback, (void*)seq);
-	if (err) {
+    err = jack_set_process_callback(seq->jack_client, process_callback, (void*)seq);
+    if (err) {
         printf("Could not register JACK process callback.\n");
-	return 0; 
-	}
+    return 0; 
+    }
 
-	seq->output_port = jack_port_register(seq->jack_client, "midi_out", JACK_DEFAULT_MIDI_TYPE,
-		JackPortIsOutput, 0);
+    if(seq->usein){
+        
+        if(verbose)printf("initializing JACK input: \ncreating ringbuffer...\n");
+        seq->ringbuffer_in = jack_ringbuffer_create(RINGBUFFER_SIZE);
 
-	if (seq->output_port == NULL) {
-        printf("Could not register JACK output port.\n");
-	return 0;
-	}
+        if (seq->ringbuffer_in == NULL) {
+            printf("Cannot create JACK ringbuffer.\n");
+        return 0;
+        }
+
+        jack_ringbuffer_mlock(seq->ringbuffer_in);
+
+        seq->input_port = jack_port_register(seq->jack_client, "midi_in", JACK_DEFAULT_MIDI_TYPE,
+            JackPortIsInput, 0);
+
+        if (seq->input_port == NULL) {
+            printf("Could not register JACK port.\n");
+        return 0;
+        }
+    }
+    if(seq->useout){
+        
+        if(verbose)printf("initializing JACK output: \ncreating ringbuffer...\n");
+        seq->ringbuffer_out = jack_ringbuffer_create(RINGBUFFER_SIZE);
+
+        if (seq->ringbuffer_out == NULL){
+            printf("Cannot create JACK ringbuffer.\n");
+        return 0;
+        }
+
+        jack_ringbuffer_mlock(seq->ringbuffer_out);
+
+        seq->output_port = jack_port_register(seq->jack_client, "midi_out", JACK_DEFAULT_MIDI_TYPE,
+            JackPortIsOutput, 0);
+
+        if (seq->output_port == NULL) {
+            printf("Could not register JACK port.\n");
+        return 0;
+        }
+    }
+    if(seq->usethru){
+        
+        seq->thru_port = jack_port_register(seq->jack_client, "midi_thru", JACK_DEFAULT_MIDI_TYPE,
+            JackPortIsInput, 0);
+
+        if (seq->thru_port == NULL) {
+            printf("Could not register JACK port.\n");
+        return 0;
+        }
+    }
 
 	if (jack_activate(seq->jack_client)) {
         printf("Cannot activate JACK client.\n");
@@ -396,5 +530,6 @@ init_jack(JACK_SEQ* seq, uint8_t verbose)
 
 void close_jack(JACK_SEQ* seq)
 {
-    jack_ringbuffer_free(seq->ringbuffer);
+    if(seq->useout)jack_ringbuffer_free(seq->ringbuffer_out);
+    if(seq->usein)jack_ringbuffer_free(seq->ringbuffer_in);
 }

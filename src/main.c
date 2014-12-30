@@ -292,7 +292,7 @@ int main(int argc, char** argv)
     }
 
     //stop everything
-    printf("/nquitting...\n");
+    printf("\nquitting...\n");
     if(!conv.mon_mode)
     {
         if(conv.verbose)
