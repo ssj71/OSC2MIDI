@@ -1,6 +1,6 @@
-loadedInterfaceName = "generic synth (phone)";
+loadedInterfaceName = "generic synth (tablet)";
 
-interfaceOrientation = "landscape";
+interfaceOrientation = "portrait";
 
 function oct(dir)
 {
@@ -72,17 +72,6 @@ control.octave = oct;
 
 pages = [[
 {
-    "name": "reset",
-    "type": "Button",
-    "bounds": [.6, .9, .14, .1],
-    "startingValue": 0,
-    "isLocal": true,
-    "mode": "contact",
-    "ontouchstart": "control.octave(0)",
-    "stroke": "#aaa",
-    "label": "reset",
-},
-{
     "name": "tabButton",
     "type": "Button",
     "bounds": [.95, .0, .05, .2],
@@ -92,27 +81,38 @@ pages = [[
     "ontouchstart": "if(this.value == this.max) { control.showToolbar(); } else { control.hideToolbar(); }",
     "label": "menu",
 },
+{
+    "name": "refresh",
+    "type": "Button",
+    "bounds": [.8, .6, .2, .4],
+    "startingValue": 0,
+    "isLocal": true,
+    "mode": "contact",
+    "ontouchstart": "interfaceManager.refreshInterface()",
+    "stroke": "#aaa",
+    "label": "refrsh",
+},
 
 //pitch and mod wheel
 {
     "name" : "pitchSlider",
     "type" : "Slider",
-    "bounds": [0, .05, .15, .9],
+    "bounds": [.31, .0, .69, .08],
     "range": [0.1,16383.1], 
     "startingValue": 8192.1,
     "address" : "/pitch",
-    "isVertical" : true,
+    "isVertical" : false,
     "isXFader" : false,
     "ontouchend": "pitchSlider.setValue(8192.1);"
 },
 {
     "name" : "modSlider",
     "type" : "Slider",
-    "bounds": [.17, .05, .15, .9], 
+    "bounds": [.31, .10, .69, .08], 
     "range": [0.1,127.1], 
     "startingValue": 63.1,
     "address" : "/midi/cc1",
-    "isVertical" : true,
+    "isVertical" : false,
     "isXFader" : false,
 },
 
@@ -120,41 +120,41 @@ pages = [[
 {
     "name" : "cc2Slider",
     "type" : "Slider",
-    "bounds": [.35, .05, .14, .65], 
+    "bounds": [.35, .05, .14, .55], 
     "range": [0.1,127.1], 
     "startingValue": 0.1,
     "address" : "/midi/cc2",
-    "isVertical" : true,
+    "isVertical" : false,
     "isXFader" : false,
 },
 {
     "name" : "cc3Slider",
     "type" : "Slider",
-    "bounds": [.51, .05, .15, .65], 
+    "bounds": [.51, .05, .15, .55], 
     "range": [0.1,127.1], 
     "startingValue": 0.1,
     "address" : "/midi/cc3",
-    "isVertical" : true,
+    "isVertical" : false,
     "isXFader" : false,
 },
 {
     "name" : "cc4Slider",
     "type" : "Slider",
-    "bounds": [.68, .05, .15, .65], 
+    "bounds": [.68, .05, .15, .55], 
     "range": [0.1,127.1], 
     "startingValue": 0.1,
     "address" : "/midi/cc4",
-    "isVertical" : true,
+    "isVertical" : false,
     "isXFader" : false,
 },
 {
     "name" : "cc5Slider",
     "type" : "Slider",
-    "bounds": [.85, .05, .14, .65], 
+    "bounds": [.85, .05, .14, .55], 
     "range": [0.1,127.1], 
     "startingValue": 0.1,
     "address" : "/midi/cc5",
-    "isVertical" : true,
+    "isVertical" : false,
     "isXFader" : false,
 },
 
@@ -162,14 +162,14 @@ pages = [[
 {
     "name" : "octLabel",
     "type" : "Label",
-    "bounds": [.6, .75, 0.14, 0.15], 
+    "bounds": [.1, .75, 0.14, 0.15], 
     "value" : "0",
     "size" : "32"
 },
 {
     "name" : "octSlider",
     "type" : "Slider",
-    "bounds": [.63, .75, 0.0, 0.0], 
+    "bounds": [.1, .75, 0.0, 0.0], 
     "range": [-4,4], 
     "startingValue": 0,
     "address" : "/octave",
@@ -179,7 +179,7 @@ pages = [[
 {
     "name": "octDnButton",
     "type": "Button",
-    "bounds": [.35, .75, .25, .25],
+    "bounds": [0, 0, .2, .1],
     "mode": "toggle",
     "stroke": "#aaa",
     "isLocal": true,
@@ -189,12 +189,23 @@ pages = [[
 {
     "name": "octUpButton",
     "type": "Button",
-    "bounds": [.74, .75, .25, .25],
+    "bounds": [0, .12, .2, .1],
     "mode": "toggle",
     "stroke": "#aaa",
     "isLocal": true,
     "ontouchstart": "control.octave(1)",
     "label": "Oct++",
+},
+{
+    "name": "reset",
+    "type": "Button",
+    "bounds": [0, .1, .1, .02],
+    "startingValue": 0,
+    "isLocal": true,
+    "mode": "contact",
+    "ontouchstart": "control.octave(0)",
+    "stroke": "#aaa",
+    "label": "reset",
 },
 
 ]
