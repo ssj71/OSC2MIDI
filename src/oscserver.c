@@ -72,7 +72,7 @@ int mon_handler(const char *path, const char *types, lo_arg ** argv,
     printf("\n\n");
     fflush(stdout);
 
-    return 1;
+    return 0;
 }
 
 //this handles the osc to midi conversions
@@ -114,5 +114,5 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
     }
     if(conv->verbose && !first)
         printf("\n");
-    return 1;
+    return 0;
 }

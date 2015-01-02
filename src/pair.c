@@ -704,7 +704,7 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
         place = p->map[i];
         if(place != -1)
         {
-            msg[place] += (uint8_t)(p->scale[place]*v + p->offset[place]); 
+            msg[place] += ((uint8_t)(p->scale[place]*v + p->offset[place]))&0x7F; 
             if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
             {
                 msg[place+1] += (uint8_t)((p->scale[place]*v + p->offset[place])/128.0); 
@@ -803,7 +803,7 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
             }
             else
             {
-                msg[place] += (uint8_t)(p->scale[place]*val + p->offset[place]); 
+                msg[place] += ((uint8_t)(p->scale[place]*val + p->offset[place]))&0x7F; 
                 if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
                 {
                     msg[place+1] += (uint8_t)((p->scale[place]*val + p->offset[place])/128.0); 

@@ -9,10 +9,11 @@ typedef struct _jseq{
     jack_client_t	*jack_client;
     jack_port_t	*output_port;
     jack_port_t	*input_port;
-    jack_port_t	*thru_port;
+    jack_port_t	*filter_in_port;
+    jack_port_t	*filter_out_port;
     uint8_t usein;
     uint8_t useout;
-    uint8_t usethru;
+    uint8_t usefilter;
     int8_t* filter;
 }JACK_SEQ;
 

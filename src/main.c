@@ -165,8 +165,8 @@ int main(int argc, char** argv)
     conv.glob_vel = 100;
     conv.convert = 0;
     seq.useout = 1;
-    seq.usein = 1;
-    seq.usethru = 0;
+    seq.usein = 0;
+    seq.usefilter = 0;
     if(argc>1)
     {
     for (i = 1;i<argc;i++)
@@ -263,7 +263,7 @@ int main(int argc, char** argv)
     else
     {
         seq.useout = 0;
-    {
+    }
     if(conv.convert < 1)
     {
         //something

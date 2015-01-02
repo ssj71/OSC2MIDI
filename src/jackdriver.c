@@ -39,81 +39,14 @@
 #include <jack/ringbuffer.h>
 #include "jackdriver.h"
 
-/*
-  In main:
-  alloc some jack stuff
-   jack_client_t	*jack_client = NULL;
-   jack_port_t	*output_port;
-   jack_ringbuffer_t *ringbuffer;
-  init_jack(0)
 
-  In IRQ
-  queue_new_message(MIDI_NOTE_ON, note, *current_velocity);
-  */
-
-
-/*
-#define VELOCITY_MAX		127
-#define VELOCITY_HIGH		100
-#define VELOCITY_NORMAL		64
-#define VELOCITY_LOW		32
-#define VELOCITY_MIN		1
-
-#define OUTPUT_PORT_NAME	"midi_out"
-#define INPUT_PORT_NAME		"midi_in"
-#define PACKAGE_NAME		"jack-keyboard"
-#define PACKAGE_VERSION		"2.7.2"
-
-jack_port_t	*output_port;
-jack_port_t	*input_port;
-int		entered_number = -1;
-int		allow_connecting_to_own_kind = 0;
-int		enable_gui = 1;
-int		grab_keyboard_at_startup = 0;
-volatile int	keyboard_grabbed = 0;
-int		enable_window_title = 0;
-int		time_offsets_are_zero = 0;
-int		send_program_change_at_reconnect = 0;
-int		send_program_change_once = 0;
-int		program_change_was_sent = 0;
-int		velocity_high = VELOCITY_HIGH;
-int		velocity_normal = VELOCITY_NORMAL;
-int		velocity_low = VELOCITY_LOW;
-int		*current_velocity = &velocity_normal;
-int		octave = 4;
-double		rate_limit = 0.0;
-jack_client_t	*jack_client = NULL;
-
-
-*/
-#define MIDI_NOTE_ON		0x90
-#define MIDI_NOTE_OFF		0x80
-/*
-#define MIDI_PROGRAM_CHANGE	0xC0
-#define MIDI_CONTROLLER		0xB0
-#define MIDI_RESET		0xFF
-#define MIDI_HOLD_PEDAL		64
-#define MIDI_ALL_SOUND_OFF	120
-#define MIDI_ALL_MIDI_CONTROLLERS_OFF	121
-#define MIDI_ALL_NOTES_OFF	123
-#define MIDI_BANK_SELECT_MSB	0
-#define MIDI_BANK_SELECT_LSB	32
-
-#define BANK_MIN		0
-#define BANK_MAX		127
-#define PROGRAM_MIN		0
-#define PROGRAM_MAX		127
-#define CHANNEL_MIN		1
-#define CHANNEL_MAX		16
-*/
-
-struct MidiMessage {
+typedef struct _MidiMessage {
 	jack_nframes_t	time;
 	int		len;	/* Length of MIDI message, in bytes. */
 	uint8_t	data[3];
-};
+} MidiMessage;
 
-#define RINGBUFFER_SIZE		1024*sizeof(struct MidiMessage)
+#define RINGBUFFER_SIZE		1024*sizeof(MidiMessage)
 
 /* Will emit a warning if time between jack callbacks is longer than this. */
 #define MAX_TIME_BETWEEN_CALLBACKS	0.1
@@ -121,18 +54,6 @@ struct MidiMessage {
 /* Will emit a warning if execution of jack callback takes longer than this. */
 #define MAX_PROCESSING_TIME	0.01
 
-//jack_ringbuffer_t *ringbuffer;
-
-/* Number of currently used program. */
-//int		program = 0;
-
-/* Number of currently selected bank. */
-//int		bank = 0;
-
-/* Number of currently selected channel (0..15). */
-//int		channel = 0;
-
-//void draw_note(int key);
 
 ///////////////////////////////////////////////
 //These functions operate in the JACK RT Thread
@@ -194,11 +115,27 @@ nframes_to_ms(jack_client_t* jack_client,jack_nframes_t nframes)
 }
 
 void
+queue_message(jack_ringbuffer_t* ringbuffer, MidiMessage *ev)
+{
+	int written;
+
+	if (jack_ringbuffer_write_space(ringbuffer) < sizeof(*ev)) {
+		printf("Not enough space in the ringbuffer, MIDI LOST.");
+		return;
+	}
+
+	written = jack_ringbuffer_write(ringbuffer, (char *)ev, sizeof(*ev));
+
+	if (written != sizeof(*ev))
+        printf("jack_ringbuffer_write failed, MIDI LOST.");
+}
+
+void
 process_midi_input(JACK_SEQ* seq,jack_nframes_t nframes)
 {
 	int read, events, i;
 	void *port_buffer;
-    struct MidiMessage *rev;
+    MidiMessage rev;
 	jack_midi_event_t event;
 
 	port_buffer = jack_port_get_buffer(seq->input_port, nframes);
@@ -227,10 +164,11 @@ process_midi_input(JACK_SEQ* seq,jack_nframes_t nframes)
                 //not sysex or something
 
                 //PUSH ONTO CIRCULAR BUFFER
-                rev->len = event.size;
-                rev->time = event.time;
-                memcpy(rev->data, event.buffer, rev->len);
-                queue_message(seq->ringbuffer_in,rev);
+                //not sure if its a true copy onto buffer, if not this won't work
+                rev.len = event.size;
+                rev.time = event.time;
+                memcpy(rev.data, event.buffer, rev.len);
+                queue_message(seq->ringbuffer_in,&rev);
             }
 		}
 
@@ -239,57 +177,73 @@ process_midi_input(JACK_SEQ* seq,jack_nframes_t nframes)
 }
 
 void
-process_midi_thru(JACK_SEQ* seq,jack_nframes_t nframes)
+process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
 {
 	int read, events, i;
-	void *port_buffer;
+    uint8_t* buffer;
+	void *inport_buffer;
+	void *outport_buffer;
 	jack_midi_event_t event;
 
-	port_buffer = jack_port_get_buffer(seq->input_port, nframes);
-	if (port_buffer == NULL) {
+	inport_buffer = jack_port_get_buffer(seq->filter_in_port, nframes);
+	if (inport_buffer == NULL) {
 		printf("jack_port_get_buffer failed, cannot receive anything.");
+		return;
+	}
+	outport_buffer = jack_port_get_buffer(seq->filter_out_port, nframes);
+	if (outport_buffer == NULL) {
+		printf("jack_port_get_buffer failed, cannot send anything.");
 		return;
 	}
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
-	events = jack_midi_get_event_count(port_buffer, nframes);
+	events = jack_midi_get_event_count(inport_buffer, nframes);
 #else
-	events = jack_midi_get_event_count(port_buffer);
+	events = jack_midi_get_event_count(inport_buffer);
+#endif
+
+#ifdef JACK_MIDI_NEEDS_NFRAMES
+	jack_midi_clear_buffer(outport_buffer, nframes);
+#else
+	jack_midi_clear_buffer(outport_buffer);
 #endif
 
 	for (i = 0; i < events; i++) {
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
-		read = jack_midi_event_get(&event, port_buffer, i, nframes);
+		read = jack_midi_event_get(&event, inport_buffer, i, nframes);
 #else
-		read = jack_midi_event_get(&event, port_buffer, i);
+		read = jack_midi_event_get(&event, inport_buffer, i);
 #endif
 		if (!read) {
 			//successful event get
 
+            //filter if note
             if (event.size <= 3 && event.size >=1) {
                 //not sysex or something
                 
-                if(event.buffer[0]&0xF0 == 0x80 || event.buffer[0]&0xF0 == 0x90)
+                if((event.buffer[0]&0xF0) == 0x80 || (event.buffer[0]&0xF0) == 0x90)
                 {
                     //note on/off event
                     event.buffer[2] += *seq->filter;
                 }
-
-                if (event.size <= 3 && event.size >=1) {
-                //not sysex or something
-
-                //PUSH ONTO CIRCULAR BUFFER
-                //TODO: IS this threadsafe (push onto ringbuffer from both sides)?
-                rev->len = event.size;
-                rev->time = event.time;
-                memcpy(rev->data, event.buffer, rev->len);
-                queue_message(seq->ringbuffer_in,rev);
-            }
                 
             }
-		}
 
+            //copy to output
+#ifdef JACK_MIDI_NEEDS_NFRAMES
+            buffer = jack_midi_event_reserve(outport_buffer, event.time, event.size, nframes);
+#else
+            buffer = jack_midi_event_reserve(outport_buffer, event.time, event.size);
+#endif
+
+            if (buffer == NULL) {
+                //warn_from_jack_thread_context("jack_midi_event_reserve failed, NOTE LOST.");
+                break;
+            }
+
+            memcpy(buffer, event.buffer, event.size);
+		}
 
 	}
 }
@@ -301,7 +255,7 @@ process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 	uint8_t *buffer;
 	void *port_buffer;
 	jack_nframes_t last_frame_time;
-	struct MidiMessage ev;
+	MidiMessage ev;
 
 	last_frame_time = jack_last_frame_time(seq->jack_client);
 
@@ -320,12 +274,12 @@ process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 	/* We may push at most one byte per 0.32ms to stay below 31.25 Kbaud limit. */
 	//bytes_remaining = nframes_to_ms(seq->jack_client,nframes) * rate_limit;
 
-	while (jack_ringbuffer_read_space(seq->ringbuffer)) {
-		read = jack_ringbuffer_peek(seq->ringbuffer, (char *)&ev, sizeof(ev));
+	while (jack_ringbuffer_read_space(seq->ringbuffer_out)) {
+		read = jack_ringbuffer_peek(seq->ringbuffer_out, (char *)&ev, sizeof(ev));
 
 		if (read != sizeof(ev)) {
             //warn_from_jack_thread_context("Short read from the ringbuffer, possible note loss.");
-			jack_ringbuffer_read_advance(seq->ringbuffer, read);
+			jack_ringbuffer_read_advance(seq->ringbuffer_out, read);
 			continue;
 		}
 
@@ -342,7 +296,7 @@ process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 		if (t < 0)
 			t = 0;
 
-		jack_ringbuffer_read_advance(seq->ringbuffer, sizeof(ev));
+		jack_ringbuffer_read_advance(seq->ringbuffer_out, sizeof(ev));
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
 		buffer = jack_midi_event_reserve(port_buffer, t, ev.len, nframes);
@@ -372,8 +326,8 @@ process_callback(jack_nframes_t nframes, void *seqq)
 
     if(seq->usein)
         process_midi_input( seq,nframes );
-    if(seq->usethru)
-        process_midi_thru( seq,nframes );
+    if(seq->usefilter)
+        process_midi_filter( seq,nframes );
     if(seq->useout)
         process_midi_output( seq,nframes );
 
@@ -388,25 +342,9 @@ process_callback(jack_nframes_t nframes, void *seqq)
 ///////////////////////////////////////////////
 //these functions are executed in other threads
 ///////////////////////////////////////////////
-void
-queue_message(jack_ringbuffer_t* ringbuffer, struct MidiMessage *ev)
-{
-	int written;
-
-	if (jack_ringbuffer_write_space(ringbuffer) < sizeof(*ev)) {
-		printf("Not enough space in the ringbuffer, MIDI LOST.");
-		return;
-	}
-
-	written = jack_ringbuffer_write(ringbuffer, (char *)ev, sizeof(*ev));
-
-	if (written != sizeof(*ev))
-        printf("jack_ringbuffer_write failed, MIDI LOST.");
-}
-
 void queue_midi(void* seqq, uint8_t msg[])
 {
-    struct MidiMessage ev;
+    MidiMessage ev;
     JACK_SEQ* seq = (JACK_SEQ*)seqq;
     ev.len = 3;
     ev.data[0] = msg[0];
@@ -416,36 +354,6 @@ void queue_midi(void* seqq, uint8_t msg[])
     ev.time = jack_frame_time(seq->jack_client);
     queue_message(seq->ringbuffer_out,&ev);
 }
-
-/*
-void noteup_jack(void* seqq, uint8_t chan, uint8_t note, uint8_t vel)
-{
-    struct MidiMessage ev;
-    JACK_SEQ* seq = (JACK_SEQ*)seqq;
-    ev.len = 3;
-    ev.data[0] = 0x80 + chan;
-    ev.data[1] = note;
-    ev.data[2] = vel;
-
-    ev.time = jack_frame_time(seq->jack_client);
-
-    queue_message(seq->ringbuffer,&ev);
-}
-
-void notedown_jack(void* seqq, uint8_t chan, uint8_t note, uint8_t vel)
-{
-    struct MidiMessage ev;
-    JACK_SEQ* seq = (JACK_SEQ*)seqq;
-    ev.len = 3;
-    ev.data[0] = 0x90 + chan;
-    ev.data[1] = note;
-    ev.data[2] = vel;
-
-    ev.time = jack_frame_time(seq->jack_client);
-
-    queue_message(seq->ringbuffer,&ev);
-}
-*/
 
 ////////////////////////////////
 //this is run in the main thread
@@ -510,12 +418,14 @@ init_jack(JACK_SEQ* seq, uint8_t verbose)
         return 0;
         }
     }
-    if(seq->usethru){
+    if(seq->usefilter){
         
-        seq->thru_port = jack_port_register(seq->jack_client, "midi_thru", JACK_DEFAULT_MIDI_TYPE,
+        seq->filter_in_port = jack_port_register(seq->jack_client, "filter_in", JACK_DEFAULT_MIDI_TYPE,
             JackPortIsInput, 0);
+        seq->filter_out_port = jack_port_register(seq->jack_client, "filter_out", JACK_DEFAULT_MIDI_TYPE,
+            JackPortIsOutput, 0);
 
-        if (seq->thru_port == NULL) {
+        if (seq->filter_in_port == NULL || seq->filter_out_port == NULL) {
             printf("Could not register JACK port.\n");
         return 0;
         }

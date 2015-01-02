@@ -100,7 +100,7 @@ pages = [[
     "bounds": [0, .05, .15, .9],
     "range": [0.1,16383.1], 
     "startingValue": 8192.1,
-    "address" : "/pitch",
+    "address" : "/midi/pitch",
     "isVertical" : true,
     "isXFader" : false,
     "ontouchend": "pitchSlider.setValue(8192.1);"
