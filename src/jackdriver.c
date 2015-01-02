@@ -362,7 +362,7 @@ int
 init_jack(JACK_SEQ* seq, uint8_t verbose)
 {
 	int err;
-    
+
     if(verbose)printf("opening client...\n");
     seq->jack_client = jack_client_open("osc2midi", JackNoStartServer, NULL);
 

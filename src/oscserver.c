@@ -33,10 +33,7 @@ lo_server_thread start_osc_server(char* port, CONVERTER* data)
         lo_server_thread_add_method(st, NULL, NULL, msg_handler, data);
 
     lo_server_thread_start(st);
-    if(data->verbose)
-    {
-        printf("starting osc server on port %s\n",port);
-    }
+    printf("starting osc server on port %s\n",port);
     return st;
 }
 
@@ -86,7 +83,7 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
 
     for(j=0;j<conv->npairs;j++)
     {
-        if( (n = try_match_osc(conv->p[j],(char *)path,(char *)types,argv,argc,&(conv->glob_chan),&(conv->glob_vel),midi)) )
+        if( (n = try_match_osc(conv->p[j],(char *)path,(char *)types,argv,argc,&(conv->glob_chan),&(conv->glob_vel),&(conv->filter),midi)) )
         {
             if(!conv->multi_match)
                 j = conv->npairs;

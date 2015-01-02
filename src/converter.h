@@ -11,6 +11,7 @@ typedef struct _CONVERTER
 {
     uint8_t glob_chan;
     uint8_t glob_vel;
+    int8_t  filter;
     uint8_t verbose;
     uint8_t mon_mode;
     uint8_t multi_match;

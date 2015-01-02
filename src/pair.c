@@ -30,6 +30,7 @@ typedef struct _PAIR
     uint8_t set_channel;//flag if message is actually control message to change global channel
     uint8_t use_glob_vel;//flag decides if using global velocity (1) or if its specified by message (0)
     uint8_t set_velocity;//flag if message is actually control message to change global velocity
+    uint8_t set_shift;//flag if message is actually control message to change filter shift value
     uint8_t raw_midi;//flag if message sends osc datatype of midi message
     uint8_t use[3];//flags for midi message (channel, data1, data2)
 
@@ -127,6 +128,19 @@ void print_pair(PAIRHANDLE ph)
         printf("%.2f ",p->offset[i]);
     printf("\n");
 #endif
+}
+
+int check_pair_set_for_filter(PAIRHANDLE* pa, int npairs)
+{
+    PAIR* p = (PAIR*)pa;
+    int i;
+
+    for(i=0;i<npairs;i++)
+    {
+        if(p[i].set_shift)
+            return 1;
+    }
+    return 0;
 }
 
 void rm_whitespace(char* str)
@@ -350,6 +364,7 @@ int get_pair_midicommand(char* config, PAIR* p)
         p->opcode = 0x04;
         p->channel = 0xFC;
         n = 1;
+        p->set_shift = 1;
     }
     else
     {
@@ -652,7 +667,7 @@ void free_pair(PAIRHANDLE ph)
 }
 
 //returns 1 if match is successful and msg has a message to be sent to the output
-int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int argc, uint8_t* glob_chan, uint8_t* glob_vel, uint8_t msg[])
+int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int argc, uint8_t* glob_chan, uint8_t* glob_vel, int8_t *filter, uint8_t msg[])
 {
     PAIR* p = (PAIR*)ph;
     //check the easy things first
@@ -797,6 +812,11 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                 *glob_vel = (uint8_t)val;
                 return -1;
             }
+            else if(p->set_shift)
+            {
+                *filter = (int8_t)val;
+                return -1;
+            }
             if(place == 3)//only used for note on or off
             {
                 msg[0] += ((uint8_t)(p->scale[place]*val + p->offset[place])>0)<<4;
@@ -884,10 +904,10 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         {
             if(p->types[i] == 'm' && p->map[i] != -1)
             {
-                m[0] = msg[0];
-                m[1] = msg[1];
-                m[2] = msg[2];
-                m[3] = 0;//TODO I don't remember what the 4th byte is supposed to be
+                m[1] = msg[0];
+                m[2] = msg[1];
+                m[3] = msg[2];
+                m[0] = 0;//port ID
                 lo_message_add_midi(oscm,m);
             }
             else

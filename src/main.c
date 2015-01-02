@@ -82,7 +82,7 @@ int load_map(CONVERTER* conv, char* path, char* file)
             i++;//line is not commented out
     }
 
-    p = (PAIRHANDLE)malloc(sizeof(PAIRHANDLE)*i);
+    p = (PAIRHANDLE*)malloc(sizeof(PAIRHANDLE)*i);
     rewind(map);
     i=0;
     while(!feof(map))
@@ -127,11 +127,12 @@ void useage()
     //printf("    -a <value>     address of OSC client for midi->OSC\n");
     printf("    -c <value>     set default MIDI channel\n");
     printf("    -vel <value>   set default MIDI note velocity\n");
+    printf("    -s <value>     set default filter shift value\n");
     printf("    -multi         multi mode (check all mappings/send multiple messages)\n");
     printf("    -single        multi mode off (stop checks after first match)\n");
     printf("    -mon           only print OSC messages that come into the port\n");
-    //printf("    -o2m           only convert OSC messages to MIDI\n");
-    //printf("    -m2o           only convert MIDI messages to OSC\n");
+    printf("    -o2m           only convert OSC messages to MIDI\n");
+    printf("    -m2o           only convert MIDI messages to OSC\n");
     printf("    -h             show this message\n");
     printf("\n");
     printf("NOTES:\n");
@@ -163,6 +164,7 @@ int main(int argc, char** argv)
     conv.multi_match = 1;
     conv.glob_chan = 0;
     conv.glob_vel = 100;
+    conv.filter = 0;
     conv.convert = 0;
     seq.useout = 1;
     seq.usein = 0;
@@ -223,8 +225,15 @@ int main(int argc, char** argv)
         }
         else if(strcmp(argv[i], "-vel") ==0)
         {
-            // global channel
+            // global velocity
             conv.glob_vel = atoi(argv[++i]);
+        }
+        else if(strcmp(argv[i], "-s") == 0)
+        {
+            // filter shift
+            conv.filter = atoi(argv[++i]);
+            seq.usefilter = 1;
+            seq.filter = &conv.filter;
         }
         else if (strcmp(argv[i], "-v") == 0) 
         {
@@ -249,6 +258,11 @@ int main(int argc, char** argv)
     {
         if(load_map(&conv,path,file) == -1)
             return -1;
+        if(check_pair_set_for_filter(conv.p,conv.npairs))
+        {
+            seq.usefilter = 1;
+            seq.filter = &conv.filter;
+        }
     }
     else if(conv.verbose)
         printf("Monitor mode, incoming OSC or MIDI messages will only be printed.\n");
@@ -289,6 +303,7 @@ int main(int argc, char** argv)
     while(!quit)
     {
         usleep(1000);
+        //here we need to read input circular buffer, check for matches and send osc
     }
 
     //stop everything
