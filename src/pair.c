@@ -132,12 +132,13 @@ void print_pair(PAIRHANDLE ph)
 
 int check_pair_set_for_filter(PAIRHANDLE* pa, int npairs)
 {
-    PAIR* p = (PAIR*)pa;
+    PAIR* p;
     int i;
 
     for(i=0;i<npairs;i++)
     {
-        if(p[i].set_shift)
+        p = (PAIR*)pa[i];
+        if(p->set_shift)
             return i+1;
     }
     return 0;

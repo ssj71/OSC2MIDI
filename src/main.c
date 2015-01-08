@@ -261,7 +261,7 @@ int main(int argc, char** argv)
     {
         if(load_map(&conv,path,file) == -1)
             return -1;
-        if(i = check_pair_set_for_filter(conv.p,conv.npairs))
+        if( (i = check_pair_set_for_filter(conv.p,conv.npairs)) )
         {
             seq.usefilter = 1;
             seq.filter = &conv.filter;
