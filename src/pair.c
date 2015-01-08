@@ -138,7 +138,7 @@ int check_pair_set_for_filter(PAIRHANDLE* pa, int npairs)
     for(i=0;i<npairs;i++)
     {
         if(p[i].set_shift)
-            return 1;
+            return i+1;
     }
     return 0;
 }
@@ -861,7 +861,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
             }
         }
 
-        //check the chanel
+        //check the channel
         if(p->use_glob_chan && (msg[0]&0x0F) != *glob_chan)
         {
             return 0;

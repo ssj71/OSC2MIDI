@@ -20,6 +20,6 @@ typedef struct _jseq{
 int init_jack(JACK_SEQ* seq, uint8_t verbose);
 void close_jack(JACK_SEQ* seq);
 void queue_midi(void* seqq, uint8_t msg[]);
-int get_midi(void* seqq, uint8_t msg[]);
+int pop_midi(void* seqq, uint8_t msg[]);
 
 #endif

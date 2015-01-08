@@ -15,7 +15,7 @@
 /midi/noteon{i} i, n,vel  : noteon( channel, n, vel);
 /midi/noteoff{i} i, n,vel : noteon( channel, n, vel );
 /chan i,c                 : setchannel( c );
-/octave i,o               : setoctave( o*12 );
+/octave i,o               : setshift( o*12 );
 
 
 

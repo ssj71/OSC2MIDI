@@ -100,7 +100,7 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
                     printf(", ");
                     lo_arg_pp((lo_type)types[i], argv[i]);
                 }
-                printf(" : %s ( %i, %i, %i )\n", opcode2cmd(midi[0]&0xF0,1), midi[0]&0x0F, midi[1], midi[2]);
+                printf(" -> %s ( %i, %i, %i )\n", opcode2cmd(midi[0]&0xF0,1), midi[0]&0x0F, midi[1], midi[2]);
                 fflush(stdout);
             }
 
@@ -112,4 +112,48 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
     if(conv->verbose && !first)
         printf("\n");
     return 0;
+}
+
+//client side
+void convert_midi_in(lo_address addr, CONVERTER* data)
+{
+    uint8_t i,n;
+    uint8_t first = 1;
+    uint8_t midi[3];
+
+    while(pop_midi(data->seq,midi))
+    {
+        char path[200];
+        lo_message oscm;
+
+        oscm = lo_message_new();
+        for(i=0;i<data->npairs;i++)
+        {
+            if( (n = try_match_midi(data->p[i], midi, &(data->glob_chan), path, oscm)) )
+            {
+                if(!data->multi_match)
+                    i = data->npairs;
+                if(data->verbose)
+                {
+                    if(first)
+                        printf("matches found:\n");
+                    first = 0;
+                    printf("  %s ( %i, %i, %i ) ->", opcode2cmd(midi[0]&0xF0,1), midi[0]&0x0F, midi[1], midi[2]);
+                    printf(" %s ", path);
+                    /*printf("%s", lo_message_get_types(oscm));
+                    for (i = 0; i < lo_message_get_argc(oscm); i++) {
+                        printf(", ");
+                        lo_arg_pp((lo_type)types[i], argv[i]);
+                    }*/
+                    //we'll see how the pp looks
+                    lo_message_pp(oscm);
+                    fflush(stdout);
+                }
+
+                //send message
+                lo_send_message(addr,path,oscm);
+            }
+        }
+        lo_message_free(oscm);
+    }
 }

@@ -355,6 +355,31 @@ void queue_midi(void* seqq, uint8_t msg[])
     queue_message(seq->ringbuffer_out,&ev);
 }
 
+int pop_midi(void* seqq, uint8_t msg[])
+{
+    int read;
+    MidiMessage ev;
+    JACK_SEQ* seq = (JACK_SEQ*)seqq;
+
+	if (jack_ringbuffer_read_space(seq->ringbuffer_in)) {
+		read = jack_ringbuffer_peek(seq->ringbuffer_in, (char *)&ev, sizeof(ev));
+
+		if (read != sizeof(ev)) {
+            //warn_from_jack_thread_context("Short read from the ringbuffer, possible note loss.");
+			jack_ringbuffer_read_advance(seq->ringbuffer_out, read);
+			return -1;
+		}
+
+		jack_ringbuffer_read_advance(seq->ringbuffer_out, sizeof(ev));
+
+        memcpy(msg,ev.data,ev.len);
+
+        return ev.len;
+	}
+    else
+        return 0;
+}
+
 ////////////////////////////////
 //this is run in the main thread
 ////////////////////////////////
@@ -419,7 +444,7 @@ init_jack(JACK_SEQ* seq, uint8_t verbose)
         }
     }
     if(seq->usefilter){
-        
+        if(verbose)printf("initializing JACK midi filter in/out pair...\n");
         seq->filter_in_port = jack_port_register(seq->jack_client, "filter_in", JACK_DEFAULT_MIDI_TYPE,
             JackPortIsInput, 0);
         seq->filter_out_port = jack_port_register(seq->jack_client, "filter_out", JACK_DEFAULT_MIDI_TYPE,

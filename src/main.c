@@ -148,8 +148,9 @@ void useage()
 
 int main(int argc, char** argv)
 {
-    char path[200],file[200], port[200], addr[200];
+    char path[200],file[200], port[200], addr[200], aport[50];
     int i;
+    lo_address loaddr;
     CONVERTER conv;
     JACK_SEQ seq;
 
@@ -159,6 +160,7 @@ int main(int argc, char** argv)
     strcat(path,"/.osc2midi/");
     strcpy(port,"57120");
     strcpy(addr,"");
+    strcpy(aport,"8000");
     conv.verbose = 0;
     conv.mon_mode = 0;
     conv.multi_match = 1;
@@ -167,7 +169,7 @@ int main(int argc, char** argv)
     conv.filter = 0;
     conv.convert = 0;
     seq.useout = 1;
-    seq.usein = 0;
+    seq.usein = 1;
     seq.usefilter = 0;
     if(argc>1)
     {
@@ -216,7 +218,8 @@ int main(int argc, char** argv)
         else if(strcmp(argv[i], "-a") ==0)
         {
             //osc client address to send return osc messaged so
-            strcpy(addr,argv[++i]);
+            //strcpy(addr,argv[++i]);
+            sscanf(argv[++i],"%[^:]:%[^:]",addr,aport);
         }
         else if(strcmp(argv[i], "-c") ==0)
         {
@@ -258,10 +261,11 @@ int main(int argc, char** argv)
     {
         if(load_map(&conv,path,file) == -1)
             return -1;
-        if(check_pair_set_for_filter(conv.p,conv.npairs))
+        if(i = check_pair_set_for_filter(conv.p,conv.npairs))
         {
             seq.usefilter = 1;
             seq.filter = &conv.filter;
+                printf("Found pair %i with filter functions, creating midi filter in/out pair.\n", i); 
         }
     }
     else if(conv.verbose)
@@ -282,6 +286,7 @@ int main(int argc, char** argv)
     {
         //something
         seq.usein = 1;
+        loaddr = lo_address_new(addr,aport);
     }
     else
     {
@@ -299,11 +304,19 @@ int main(int argc, char** argv)
         conv.seq = (void*)&seq;
     }
 
+    if(conv.verbose)
+        printf("Ready.\n");
+
     signal(SIGINT, quitter);
     while(!quit)
     {
-        usleep(1000);
-        //here we need to read input circular buffer, check for matches and send osc
+        if(conv.convert > -1)
+        {
+            convert_midi_in(addr,&conv);
+            usleep(10);
+        }
+        else
+            usleep(1000);
     }
 
     //stop everything
@@ -319,6 +332,10 @@ int main(int argc, char** argv)
         if(conv.verbose)
             printf(" closing osc server\n");
         stop_osc_server(st);
+    }
+    if(conv.convert < 1)
+    {
+        lo_address_free(loaddr);
     }
     return 0;
 }
