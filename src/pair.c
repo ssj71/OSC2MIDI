@@ -889,12 +889,12 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
             if(place != -1)
             {
                 s[0] = p->types[i];
-                lo_message_add( m, s, (msg[place] - p->offset[place]) / p->scale[place] );
+                lo_message_add( oscm, s, (msg[place] - p->offset[place]) / p->scale[place] );
             }
             else
             {
                 s[0] = p->types[i];
-                lo_message_add(m,s,0);//we have no idea what should be in these, so just load a 0
+                lo_message_add(oscm,s,0);//we have no idea what should be in these, so just load a 0
             }
         }
     }

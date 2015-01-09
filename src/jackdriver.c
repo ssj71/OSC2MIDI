@@ -366,11 +366,11 @@ int pop_midi(void* seqq, uint8_t msg[])
 
 		if (read != sizeof(ev)) {
             //warn_from_jack_thread_context("Short read from the ringbuffer, possible note loss.");
-			jack_ringbuffer_read_advance(seq->ringbuffer_out, read);
+			jack_ringbuffer_read_advance(seq->ringbuffer_in, read);
 			return -1;
 		}
 
-		jack_ringbuffer_read_advance(seq->ringbuffer_out, sizeof(ev));
+		jack_ringbuffer_read_advance(seq->ringbuffer_in, sizeof(ev));
 
         memcpy(msg,ev.data,ev.len);
 
