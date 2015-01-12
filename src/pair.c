@@ -835,11 +835,69 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
     return 1;
 }
 
+int load_osc_value(lo_message oscm, char type, float val)
+{
+    switch(type)
+    {
+        case 'i':
+            lo_message_add_int32(oscm,(int)val);
+            break;
+        case 'h'://long
+            lo_message_add_int64(oscm,(long)val);
+            break;
+        case 'f':
+            lo_message_add_float(oscm,val);
+            break;
+        case 'd':
+            lo_message_add_double(oscm,(double)val);
+            break;
+        case 'c'://char
+            lo_message_add_char(oscm,(char)val);
+            break;
+        case 'T'://true
+            lo_message_add_true(oscm);
+            break;
+        case 'F'://false
+            lo_message_add_false(oscm);
+            break;
+        case 'N'://nil
+            lo_message_add_nil(oscm);
+            break;
+        case 'I'://impulse
+            lo_message_add_infinitum(oscm);
+            break;
+        //all the following just load with null values
+        case 'm'://midi
+        {
+            uint8_t m[4] = {0,0,0,0};            
+            lo_message_add_midi(oscm,m);
+            break;
+        }
+        case 's'://string
+            lo_message_add_string(oscm,"");//at some point may want to be able to interpret/send numbers as strings?
+            break;
+        case 'b'://blob
+            lo_message_add_blob(oscm,0);
+        case 'S'://symbol
+            lo_message_add_symbol(oscm,"");
+        case 't'://timetag
+        {
+            lo_timetag t;
+            lo_timetag_now(&t);
+            lo_message_add_timetag(oscm,t);
+        }
+        default:
+            //this isn't supported, they shouldn't use it as an arg, return error
+            return 0;
+
+    }
+    return 1;
+}
+
 int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path, lo_message oscm)
 {
     PAIR* p = (PAIR*)ph;
     uint8_t i,place,m[4] = {0,0,0,0};
-    char s[2] = {0,0};
     char chunk[100];
 
     if(!p->raw_midi)
@@ -888,13 +946,11 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
             place = p->map[i+p->argc_in_path];
             if(place != -1)
             {
-                s[0] = p->types[i];
-                lo_message_add( oscm, s, (msg[place] - p->offset[place]) / p->scale[place] );
+                load_osc_value( oscm,p->types[i],(msg[place] - p->offset[place]) / p->scale[place] );
             }
             else
             {
-                s[0] = p->types[i];
-                lo_message_add(oscm,s,0);//we have no idea what should be in these, so just load a 0
+                load_osc_value( oscm,p->types[i],0 );//we have no idea what should be in these, so just load a 0
             }
         }
     }
@@ -913,8 +969,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
             }
             else
             {
-                s[0] = p->types[i];
-                lo_message_add(oscm,s,0);//we have no idea what should be in these, so just load a 0
+                load_osc_value( oscm,p->types[i],0 );//we have no idea what should be in these, so just load a 0
             }
         }
     }
