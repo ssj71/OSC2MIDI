@@ -194,6 +194,7 @@ int main(int argc, char** argv)
         {
             //monitor mode (osc messages)
             conv.mon_mode = 1;
+            conv.convert = 1;
         }
         else if(strcmp(argv[i], "-m2o") ==0)
         {
@@ -219,7 +220,10 @@ int main(int argc, char** argv)
         {
             //osc client address to send return osc messaged so
             //strcpy(addr,argv[++i]);
-            sscanf(argv[++i],"%[^:]:%[^:]",addr,aport);
+            if(!sscanf(argv[++i],"%[^:]:%[^:]",addr,aport))
+            {
+                sscanf(argv[i],":%[^:]",aport);
+            }
         }
         else if(strcmp(argv[i], "-c") ==0)
         {
@@ -284,9 +288,10 @@ int main(int argc, char** argv)
     }
     if(conv.convert < 1)
     {
-        //something
+        //get address ready to send osc messages to
         seq.usein = 1;
         loaddr = lo_address_new(addr,aport);
+        printf(" sending osc messages to address %s:%s\n",addr,aport);
     }
     else
     {
@@ -310,7 +315,7 @@ int main(int argc, char** argv)
     signal(SIGINT, quitter);
     while(!quit)
     {
-        if(conv.convert > -1)
+        if(conv.convert < 1)
         {
             convert_midi_in(addr,&conv);
             usleep(10);

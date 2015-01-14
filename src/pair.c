@@ -981,7 +981,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         place = p->map[i];
         if(p->map[place] != -1)
         {
-            sprintf(chunk, p->path[i], (msg[place] - p->offset[place]) / p->scale[place]);
+            sprintf(chunk, p->path[i], (int)((msg[place] - p->offset[place]) / p->scale[place]));
         }
         else
         {

@@ -126,9 +126,9 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
         char path[200];
         lo_message oscm;
 
-        oscm = lo_message_new();
         for(i=0;i<data->npairs;i++)
         {
+            oscm = lo_message_new();
             if( (n = try_match_midi(data->p[i], midi, &(data->glob_chan), path, oscm)) )
             {
                 if(!data->multi_match)
@@ -153,7 +153,7 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
                 //send message
                 lo_send_message(addr,path,oscm);
             }
+            lo_message_free(oscm);
         }
-        lo_message_free(oscm);
     }
 }
