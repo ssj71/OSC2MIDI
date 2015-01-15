@@ -317,7 +317,7 @@ int main(int argc, char** argv)
     {
         if(conv.convert < 1)
         {
-            convert_midi_in(addr,&conv);
+            convert_midi_in(loaddr,&conv);
             usleep(10);
         }
         else

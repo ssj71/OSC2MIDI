@@ -3,7 +3,7 @@
 
 # this is a highly configurable mapping from OSC messages to MIDI messages and
 # back. Each uncommented line follows the form:
-#        [OscPath] [ArgTypes], [ArgName1], [ArgName2], ..., [ArgNameN] : [MIDIFUNCTION](args);
+#  [OscPath] [ArgTypes], [VarName1], [VarName2], ..., [VarNameN] : [MIDIFUNCTION](args);
 
 # more info is below the actual configuration specified in this file. This  
 # mapping works with all the default interfaces that come with control
@@ -35,7 +35,7 @@
  # conways game of life
 /life/{i} i, note, val : note( channel, 127-note,velocity, val);
  # monome
-/slider{i} f, indx,val : controlchange( channel, indx, val);
+/slider{i} f, indx,val : controlchange( channel, indx, val*127);
 /mlr/press iii, x,y,val : note( channel, x*2+54, velocity, val);
 /mlr/press iii, x,y,val : note( channel, y*4+48, velocity, val);
  # multibutton
@@ -57,15 +57,11 @@
 /accelerometer fff, x,y,z : controlchange( channel, 3, z);
 
 
-
-
-
-
 # The first thing to note is that you can pass arguments through the OSC message
 # path. The character sequence "{i}" indicates an integer in the path. This allows you to 
 # map many things quicky. For example rather than type out 127 mappings to include each
 # control number, you just pull the index of the controller out of the path. This
-# makes the first [ArgName] (i.e. "ctl" above) actually in the path rather than
+# makes [VarName1] (i.e. "touch" above) actually in the path rather than
 # lining up with the argument types listed after the path. Only integer types are 
 # supported in the path.
 
@@ -89,7 +85,7 @@
 
 # The global channel can be controlled through OSC by mapping an arbitrary
 # OSC path to execute the function setchannel() rather than one of the 
-# midi functions. The parallel for velopcity is setvelocity()
+# midi functions. The parallel for velocity is setvelocity()
 
 # Naturally, the global channel or velocity doesn't have to be used at all. You could
 # specify these values in each message through an argument or the OSC path. i.e.
@@ -98,17 +94,17 @@
 #  /supercontroller d f h, ctl,value,grapefruit : controlchange(grapefruit,ctl,value);
 
 # So you see the ordering and naming of the variables is arbitrary. You can also
-# do some conditioning of the variables such as in the pitchbend and control
-# change examples in the mapping declared by this file. Only the */+- operators
+# do some conditioning of the variables such as in the first few uncommented 
+# examples in the mapping declared by this file. Only the */+- operators
 # are supported and only in the form of variable*/const +- const. You cannot
-# use arguments to condition other arguemnts, only constants. You can also simply
+# use variables to condition other variables, only constants. You can also simply
 # have a constant for an argument;
 
 # The important formatting details for each mapping are that the path and argment
 # types are separated by a space, the first comma indicates the first argument 
 # name (naming the variable in the path or actual OSC argument), second comma 
-# for the next argument etc. The comma separates the OSC information from the midi
-# information. After the comma must have a valid function name with the correct
+# for the next argument etc. The colon separates the OSC information from the midi
+# information. After the colon must appear a valid function name with the correct
 # number of arguments. Each mapping must have its own line.
 
 # The full list of supported Midi Functions is as follows:
@@ -125,6 +121,7 @@
 
 # non-Midi functions that operate other system functions are:
 #  setchannel( channelNumber );  # set the global channel
+#  setvelocity( velocity );  # set the global velocity
 
 # If you make a mapping file that others could find useful please submit it and I
 # will add it to the files provided by the project
