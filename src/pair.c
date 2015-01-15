@@ -898,7 +898,7 @@ int load_osc_value(lo_message oscm, char type, float val)
 int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path, lo_message oscm)
 {
     PAIR* p = (PAIR*)ph;
-    uint8_t i,place,m[4] = {0,0,0,0};
+    uint8_t i,place,m[4] = {0,0,0,0}, noteon = 0;
     char chunk[100];
 
     if(!p->raw_midi)
@@ -914,6 +914,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
                     
                     return 0;
                 }
+                noteon = 1;
             }
             else
             {
@@ -945,7 +946,11 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         for(i=0;i<p->argc;i++)
         {
             place = p->map[i+p->argc_in_path];
-            if(place != -1)
+            if(place == 3)
+            {
+                load_osc_value( oscm,p->types[i],(noteon - p->offset[place]) / p->scale[place] );
+            }
+            else if(place != -1)
             {
                 load_osc_value( oscm,p->types[i],(msg[place] - p->offset[place]) / p->scale[place] );
             }
@@ -980,7 +985,11 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
     for(i=0;i<p->argc_in_path;i++)
     {
         place = p->map[i];
-        if(p->map[place] != -1)
+        if(place == 3)
+        {
+            load_osc_value( oscm,p->types[i],(noteon - p->offset[place]) / p->scale[place] );
+        }
+        else if(place != -1)
         {
             sprintf(chunk, p->path[i], (int)((msg[place] - p->offset[place]) / p->scale[place]));
         }
