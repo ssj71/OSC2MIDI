@@ -7,7 +7,7 @@
 
 # more info is below the actual configuration specified in this file. This  
 # mapping works with all the default interfaces that come with control
-# I have also made several better maps for individual interfaces
+# I have also made better maps for some individual interfaces
 
  # multitouch
 /multi/{i} ff, touch,x,y : controlchange( channel, touch, x*127);
@@ -22,7 +22,7 @@
 /leftMidCut i, val : controlchange( channel, 2, val);
 /leftLowCut i, val : controlchange( channel, 3, val);
 /leftVolume f, val : controlchange( channel, 4, val);
-/leftMulti{i} f, indx,val : controlchange( channel, 5+indx, val);
+/leftMulti/{i} f, indx,val : controlchange( channel, 5+indx, val);
 /leftCue i, val : controlchange( channel, 9, val);
 /crossfader f, val : controlchange( channel, 10, val);
 /crossfader i, val : controlchange( channel, 10, val);
@@ -30,7 +30,7 @@
 /rightMidCut i, val : controlchange( channel, 12, val);
 /rightLowCut i, val : controlchange( channel, 13, val);
 /rightVolume f, val : controlchange( channel, 14, val);
-/rightMulti{i} f, indx,val : controlchange( channel, 15+indx, val);
+/rightMulti/{i} f, indx,val : controlchange( channel, 15+indx, val);
 /rightCue i, val : controlchange( channel, 19, val);
  # conways game of life
 /life/{i} i, note, val : note( channel, 127-note,velocity, val);
@@ -43,7 +43,14 @@
  # sequencer
 /sliders0/{i} f, step,val : setvelocity( val );
 /sliders{i}/{i} f, cc,step,val : controlchange( channel, cc, val);
-/grid/{i} i, button,state : note( channel, -0.10694*button+85.0470, velocity, state);
+/grid/{0:15} i, state : note( channel, 84, velocity, state);
+/grid/{16:31} i, state : note( channel, 83, velocity, state);
+/grid/{32:47} i, state : note( channel, 81, velocity, state);
+/grid/{48:63} i, state : note( channel, 79, velocity, state);
+/grid/{64:79} i, state : note( channel, 77, velocity, state);
+/grid/{80:95} i, state : note( channel, 76, velocity, state);
+/grid/{96:111} i, state : note( channel, 74, velocity, state);
+/grid/{112:127} i, state : note( channel, 72, velocity, state);
  # accelerometer
 /accelerometer fff, x,y,z : controlchange( channel, 1, x);
 /accelerometer fff, x,y,z : controlchange( channel, 2, y);
@@ -61,6 +68,13 @@
 # makes the first [ArgName] (i.e. "ctl" above) actually in the path rather than
 # lining up with the argument types listed after the path. Only integer types are 
 # supported in the path.
+
+# Similarly you can add ranges of integer numbers in a path using brackets and a range
+# separated by colons. The "/grid{a:b}" paths above are good examples. They allow
+# easier mapping of many paths to a single midi command. You can have a third number
+# between the bounds of the range indicating step size i.e. {-2:3:6} will be every
+# third number from -2 to 6 (-2, 1, 4). When converting from midi to osc the first
+# number in the range is used each time.
 
 # This could of course be accomplished through sending 2 arguments, but doing so
 # isn't as simple when designing a Control template. Both ways are fully supported.
