@@ -1,0 +1,15 @@
+# sequencer.omm
+# spencer jackson
+
+# this mapping is for the sequencer interface that is default in Control
+
+/sliders0/{i} f, step,val : setvelocity( val );
+/sliders{i}/{i} f, cc,step,val : controlchange( channel, cc, val);
+/grid/{0-15} i, state : note( channel, 84, velocity, state);
+/grid/{16-31} i, state : note( channel, 83, velocity, state);
+/grid/{32-47} i, state : note( channel, 81, velocity, state);
+/grid/{48-63} i, state : note( channel, 79, velocity, state);
+/grid/{64-79} i, state : note( channel, 77, velocity, state);
+/grid/{80-95} i, state : note( channel, 76, velocity, state);
+/grid/{96-111} i, state : note( channel, 74, velocity, state);
+/grid/{112-127} i, state : note( channel, 72, velocity, state);

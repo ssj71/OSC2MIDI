@@ -726,6 +726,7 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                 msg[place+1] += (uint8_t)((p->scale[place]*v + p->offset[place])/128.0); 
             }
         }
+        path += n;
         //path = tmp;
     }
     //compare the end of the path

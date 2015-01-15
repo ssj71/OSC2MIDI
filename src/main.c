@@ -105,11 +105,11 @@ int load_map(CONVERTER* conv, char* path, char* file)
     }
     if(conv->verbose)
     {
-        printf("%i pairs created.\n ",i-1);
+        printf("%i pairs created.\n ",i);
     }
-    conv->npairs = i-1;
+    conv->npairs = i;
     conv->p = p;
-    return i-1;
+    return i;
 } 
 
 void useage()
