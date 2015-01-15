@@ -100,7 +100,7 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
                     printf(", ");
                     lo_arg_pp((lo_type)types[i], argv[i]);
                 }
-                printf(" -> %s ( %i, %i, %i )\n", opcode2cmd(midi[0]&0xF0,1), midi[0]&0x0F, midi[1], midi[2]);
+                printf(" -> %s ( %i, %i, %i )\n", opcode2cmd(midi[0],1), midi[0]&0x0F, midi[1], midi[2]);
                 fflush(stdout);
             }
 
@@ -138,7 +138,7 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
                     if(first)
                         printf("matches found:\n");
                     first = 0;
-                    printf("  %s ( %i, %i, %i ) ->", opcode2cmd(midi[0]&0xF0,1), midi[0]&0x0F, midi[1], midi[2]);
+                    printf("  %s ( %i, %i, %i ) ->", opcode2cmd(midi[0],1), midi[0]&0x0F, midi[1], midi[2]);
                     printf(" %s ", path);
                     /*printf("%s", lo_message_get_types(oscm));
                     for (i = 0; i < lo_message_get_argc(oscm); i++) {

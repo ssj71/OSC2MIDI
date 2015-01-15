@@ -7,6 +7,7 @@
 
 # more info is below the actual configuration specified in this file. This  
 # mapping works with all the default interfaces that come with control
+# I have also made several better maps for individual interfaces
 
  # multitouch
 /multi/{i} ff, touch,x,y : controlchange( channel, touch, x*127);
@@ -42,7 +43,7 @@
  # sequencer
 /sliders0/{i} f, step,val : setvelocity( val );
 /sliders{i}/{i} f, cc,step,val : controlchange( channel, cc, val);
-/grid/{i} i, button,state : note( channel, 84-button/32, velocity, state);
+/grid/{i} i, button,state : note( channel, -0.10694*button+85.0470, velocity, state);
  # accelerometer
 /accelerometer fff, x,y,z : controlchange( channel, 1, x);
 /accelerometer fff, x,y,z : controlchange( channel, 2, y);
