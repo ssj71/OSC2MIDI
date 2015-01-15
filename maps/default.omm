@@ -35,7 +35,7 @@
  # conways game of life
 /life/{i} i, note, val : note( channel, 127-note,velocity, val);
  # monome
-/slider{i} f, indx,val : controlchange( channel, indx, val);
+/slider{i} f, indx,val : controlchange( channel, indx, val*127);
 /mlr/press iii, x,y,val : note( channel, x*2+54, velocity, val);
 /mlr/press iii, x,y,val : note( channel, y*4+48, velocity, val);
  # multibutton
