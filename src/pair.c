@@ -208,8 +208,10 @@ int get_pair_argtypes(char* config, PAIR* p)
     int i,j = 0;
     if(!sscanf(config,"%*s %[^,],%*[^:]:%*[^(](%*[^)])",argtypes))
     {
-        printf("\nERROR in config line:\n%s -could not get OSC data types!\n\n",config);
-        return -1;
+        //it could be an error or it just doesn't have any args
+        //printf("\nERROR in config line:\n%s -could not get OSC data types!\n\n",config);
+        //return -1;
+        strcpy(argtypes,"");
     }
 
     //now get the argument types
@@ -254,7 +256,7 @@ int get_pair_midicommand(char* config, PAIR* p)
 {
     char midicommand[100];
     int n;
-    if(!sscanf(config,"%*s %*[^,],%*[^:]:%[^(](%*[^)])",midicommand))
+    if(!sscanf(config,"%*s%*[^,],%*[^:]:%[^(](%*[^)])",midicommand))
     {
         printf("\nERROR in config line:\n%s -could not get MIDI command!\n\n",config);
         return -1;
@@ -373,9 +375,9 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     arg1[0]=0;
     arg2[0]=0;
     arg3[0]=0;
-    if(2 < sscanf(config,"%*s %*[^,],%[^:]:%*[^(](%[^)])",argnames,midiargs))
+    if(2 < sscanf(config,"%*s%*[^,],%[^:]:%*[^(](%[^)])",argnames,midiargs))
     {
-        if(!sscanf(config,"%*s %*[^,],%*[^:]:%*[^(](%[^)])",midiargs))
+        if(!sscanf(config,"%*s%*[^,],%*[^:]:%*[^(](%[^)])",midiargs))
         {
             printf("\nERROR in config line:\n%s -could not get MIDI command arguments!\n\n",config);
             return -1;
