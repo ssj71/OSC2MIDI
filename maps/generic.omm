@@ -9,13 +9,13 @@
 # is specifically for the default Control templates also included in this repo.
 
 
-/midi/cc{i} f, ctl, val   : controlchange( channel, ctl, val/127 );
+/midi/cc{i} f, ctl, val   : controlchange( channel, ctl, val*127 );
 /midi/pc f, pgm           : programchange( channel, pgm );  
 /midi/pitch f, bend       : pitchbend( channel, bend*8192 );
-/midi/noteon{i} i, n,vel  : noteon( channel, n, vel);
+/midi/noteon{i} i, n,vel  : noteon( channel, n, vel );
 /midi/noteoff{i} i, n,vel : noteon( channel, n, vel );
-/chan i,c                 : setchannel( c );
-/octave i,o               : setshift( o*12 );
+/chan i, c                : setchannel( c );
+/octave i, o              : setshift( o*12 );
 
 
 

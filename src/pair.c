@@ -74,7 +74,7 @@ void print_pair(PAIRHANDLE ph)
     printf("\b\b : %s",opcode2cmd(p->opcode, 0));
     if(p->opcode==0x80)
     {
-        //check if 4 arguments
+        //note or note off, check if 4 arguments
         for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=3;i++);
         if(i==p->argc+p->argc_in_path)
             printf("off");
@@ -491,7 +491,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                 //get conditioning, should be pre=b+a* and/or post=*a+b
                 if(strlen(pre))
                 {
-                    char s1[4],s2[4];
+                    char s1[20],s2[20];
                     float a,b;
                     switch(sscanf(pre,"%f%[-+* ]%f%[+-* ]",&b,s1,&a,s2))
                     {
@@ -501,6 +501,13 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                                 p->scale[i] *= a;
                             }
                             else
+                            {
+                                printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
+                                return -1;
+                            }
+                        case 3:
+                            rm_whitespace(s2);
+                            if(strlen(s2))
                             {
                                 printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
                                 return -1;
@@ -536,7 +543,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                 }//if pre conditions
                 if(strlen(post))
                 {
-                    char s1[4],s2[4];
+                    char s1[20],s2[20];
                     float a,b;
                     switch(sscanf(post,"%[-+*/ ]%f%[+- ]%f",s1,&a,s2,&b))
                     {
@@ -553,6 +560,13 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                             {
                                 printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
                                 return -1; 
+                            }
+                        case 3:
+                            rm_whitespace(s2);
+                            if(strlen(s2))
+                            {
+                                printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
+                                return -1;
                             }
                         case 2:
                             if(strchr(s1,'*'))
@@ -806,17 +820,20 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
             //check if this is a message to set global channel
             if(p->set_channel)
             {
-                *glob_chan = (uint8_t)val;
+                msg[place+1] = (uint8_t)(p->scale[place]*val + p->offset[place]);
+                *glob_chan = msg[place+1];
                 return -1;//not an error but don't need to send a midi message (ret 0 for error)
             }   
             else if(p->set_velocity)
             {
-                *glob_vel = (uint8_t)val;
+                msg[place+1] = (uint8_t)(p->scale[place]*val + p->offset[place]);
+                *glob_vel = msg[place+1];
                 return -1;
             }
             else if(p->set_shift)
             {
-                *filter = (int8_t)val;
+                msg[place+1] = (uint8_t)(p->scale[place]*val + p->offset[place]);
+                *filter = msg[place+1];
                 return -1;
             }
             if(place == 3)//only used for note on or off
