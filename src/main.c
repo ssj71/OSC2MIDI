@@ -124,7 +124,7 @@ void useage()
     printf("    -v             verbose mode\n");
     printf("    -p <value>     set OSC server port\n");
     printf("    -m <value>     set mapping file by name or path\n");
-    //printf("    -a <value>     address of OSC client for midi->OSC\n");
+    printf("    -a <value>     address of OSC client for midi->OSC, <ip:port>\n");
     printf("    -c <value>     set default MIDI channel\n");
     printf("    -vel <value>   set default MIDI note velocity\n");
     printf("    -s <value>     set default filter shift value\n");

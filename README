@@ -1,12 +1,8 @@
-THIS PROJECT IS NOW IN AN ALPHA PHASE
-you may begin testing and using this.
-
 OSC2MIDI is a highly configurable OSC to jack MIDI bridge for linux. It was designed especially
 for use of the open source Android app called "Control (OSC+MIDI)" but was deliberately written
 to be flexible enough to be used with any OSC controller or target.
-Currently messages are only converted from OSC to MIDI but implementing the inverse is under way.
 
-To try it out download a snapshot of these files, extract them, and open the resulting directory.
+To try it out download the source files, extract them, and open the resulting directory.
 
 This project uses cmake. The easiest and safest way to install is to do the following commands:
   mkdir build
