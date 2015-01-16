@@ -112,22 +112,6 @@ void print_pair(PAIRHANDLE ph)
         printf(", %.2f*%c + %.2f",p->scale[3],'a'+i,p->offset[3]);
 
     printf(" )\n");
-
-    //debugging view
-#if(0)
-    printf("  l: %i, map: ", p->argc+p->argc_in_path);
-    for(i=0;i<p->argc+p->argc_in_path;i++)
-        printf("%i ",p->map[i]);
-    printf("\n");
-    printf("       scale: ");
-    for(i=0;i<p->argc+p->argc_in_path;i++)
-        printf("%.2f ",p->scale[i]);
-    printf("\n");
-    printf("      offset: ");
-    for(i=0;i<p->argc+p->argc_in_path;i++)
-        printf("%.2f ",p->offset[i]);
-    printf("\n");
-#endif
 }
 
 int check_pair_set_for_filter(PAIRHANDLE* pa, int npairs)
@@ -502,16 +486,11 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                             }
                             else
                             {
-                                printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
+                                printf("\nERROR in config line:\n%s -could not get pre conditioning in MIDI arg %i! nonsensical operator?\n\n",config,i);
                                 return -1;
                             }
                         case 3:
-                            rm_whitespace(s2);
-                            if(strlen(s2))
-                            {
-                                printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
-                                return -1;
-                            }
+                            //if its not whitespace, its nonsensical, we'll ignore it
                         case 2:
                             if(strchr(s1,'*'))
                             {
@@ -534,9 +513,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                             }
                             else
                             {
-                               // printf("\nERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
-                                //return -1; 
-                                //just ignore it
+                                //if its not whitespace, its nonsensical, we'll ignore it
                             }
                             break;
                     }//switch
@@ -558,16 +535,11 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                             }
                             else
                             {
-                                printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
+                                printf("\nERROR in config line:\n%s -could not get post conditioning in MIDI arg %i! nonsensival operator?\n\n",config,i);
                                 return -1; 
                             }
                         case 3:
-                            rm_whitespace(s2);
-                            if(strlen(s2))
-                            {
-                                printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
-                                return -1;
-                            }
+                            //if its not whitespace, its nonsensical, we'll ignore it
                         case 2:
                             if(strchr(s1,'*'))
                             {
@@ -587,9 +559,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                             }
                             break;
                         default:
-                            //printf("\nERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
-                            //return -1; 
-                            //ignore it
+                            //if its not whitespace, its nonsensical, we'll ignore it
                             break;
                     }//switch
                     

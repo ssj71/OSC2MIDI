@@ -318,10 +318,10 @@ int main(int argc, char** argv)
         if(conv.convert < 1)
         {
             convert_midi_in(loaddr,&conv);
-            usleep(10);
+            usleep(1000);
         }
         else
-            usleep(1000);
+            usleep(50000);
     }
 
     //stop everything
