@@ -100,7 +100,10 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
                     printf(", ");
                     lo_arg_pp((lo_type)types[i], argv[i]);
                 }
-                printf(" -> %s ( %i, %i, %i )\n", opcode2cmd(midi[0],1), midi[0]&0x0F, midi[1], midi[2]);
+                if(n>0)
+                    printf(" -> %s ( %i, %i, %i )\n", opcode2cmd(midi[0],1), midi[0]&0x0F, midi[1], midi[2]);
+                else
+                    printf(" -> %s ( %i )\n", opcode2cmd(midi[0],1), (int8_t) midi[1]);
                 fflush(stdout);
             }
 
