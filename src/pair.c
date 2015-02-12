@@ -21,18 +21,23 @@ typedef struct _PAIR
     char* types;
     
     //conversion factors
-    int8_t* map;//which byte in the midi message by index of var in OSC message (including in path args)
-    float scale[4];//scale factor for each argument going into the midi message
-    float offset[4];//linear offset for each arg going to midi message
+    int8_t* map;            //which byte in the midi message by index of var in OSC message (including in path args)
+    float scale[4];         //scale factor for each argument going into the midi message
+    float offset[4];        //linear offset for each arg going to midi message
+    float midi_rangemin[4]; //range bounds for midi args
+    float midi_rangemax[4]; //
+    float osc_rangemin[];   //range bounds for osc args
+    float osc_rangemax[];   //
+    float osc_const[];      //constant values for osc args
 
     //flags
-    uint8_t use_glob_chan;//flag decides if using global channel (1) or if its specified by message (0)
-    uint8_t set_channel;//flag if message is actually control message to change global channel
-    uint8_t use_glob_vel;//flag decides if using global velocity (1) or if its specified by message (0)
-    uint8_t set_velocity;//flag if message is actually control message to change global velocity
-    uint8_t set_shift;//flag if message is actually control message to change filter shift value
-    uint8_t raw_midi;//flag if message sends osc datatype of midi message
-    uint8_t use[3];//flags for midi message (channel, data1, data2)
+    uint8_t use_glob_chan;  //flag decides if using global channel (1) or if its specified by message (0)
+    uint8_t set_channel;    //flag if message is actually control message to change global channel
+    uint8_t use_glob_vel;   //flag decides if using global velocity (1) or if its specified by message (0)
+    uint8_t set_velocity;   //flag if message is actually control message to change global velocity
+    uint8_t set_shift;      //flag if message is actually control message to change filter shift value
+    uint8_t raw_midi;       //flag if message sends osc datatype of midi message
+    uint8_t use[3];         //flags for midi message (channel, data1, data2) is a constant (1) or range (2)
 
     //midi data
     uint8_t opcode;
@@ -43,6 +48,7 @@ typedef struct _PAIR
 }PAIR;
 
 
+//TODO: add printing osc constants, ranges
 void print_pair(PAIRHANDLE ph)
 {
     int i;
@@ -260,7 +266,7 @@ int get_pair_argtypes(char* config, PAIR* p)
                 break;
         }
     }
-    p->types[j] = 0;//null terminate. Its good practice
+    p->types[j] = 0;//null terminate. It's good practice
     for(i=0;i<strlen(argtypes)+p->argc_in_path;i++)
         p->map[j] = -1;//initialize mapping for in-path args
     return 0;
@@ -375,6 +381,206 @@ int get_pair_midicommand(char* config, PAIR* p)
     return n;
 }
 
+//for each midi args
+//  check if constant, range or keyword (glob chan etc)
+//  else go through osc args to find match
+//  get conditioning
+//for each osc arg
+//  if not used, check if constant
+//  if used get conditioning
+
+//TODO: add get_pair_arg_varname, get_pair_constant_arg, get_pair_osc_arg_index
+int get_pair_arg_format(char* arg, PAIR* p, uint8_t oscarg, uint8_t index)
+{
+    uint8_t i = index;
+
+    p->scale[i] = 1;
+    p->offset[i] = 0;
+    pre[0] = 0;
+    var[0] = 0;
+    post[0] = 0;
+
+    tmp = arg;
+    if( !(j = sscanf(tmp,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,var,post)) )
+    {
+        j = sscanf(tmp,"%[^*/+- ]%[.1234567890*/+- ]",var,post);
+    }
+    if(!j)
+    {
+        printf("\nERROR in config line:\n%s -could not understand arg %i in midi command\n\n",config,i);
+        return -1;
+    }
+    if (strlen(var)==0)
+    {
+        //must be a constant or range
+        if(!sscanf(pre,"%f%*[- ]%f",&f,&f2))
+        {
+            //range TODO: store max and min
+            arg[i] = f;
+            use[i] = 2;
+        }
+        else
+        {
+            //constant
+            if(!sscanf(pre,"%f",&f))
+            {
+                printf("\nERROR in config line:\n%s -could not get constant arg %i in midi command\n\n",config,i);
+                return -1;
+            }
+            arg[i] = (uint8_t)f;
+            use[i] = 1;
+        }
+    }
+    else//not a constant
+    {
+        //check if its the global channel keyword
+        if(!strncmp(var,"channel",7))
+        {
+            p->use_glob_chan = 1;
+            p->scale[i] = 1;
+            p->offset[i] = 0;
+            arg[i] = 0;
+            use[i] = 0;
+        }
+        else if(!strncmp(var,"velocity",8))
+        {
+            p->use_glob_vel = 1;
+            p->scale[i] = 1;
+            p->offset[i] = 0;
+            arg[i] = 0;
+            use[i] = 0;
+        }
+        else
+        {
+            //find where it is in the OSC message
+            k = strlen(var);
+            tmp = argnames;
+            for(j=0;(j<p->argc_in_path+p->argc) && tmp;j++)
+            {
+                if(!strncmp(var,tmp,k) && *(tmp+k) == ',')
+                {
+                    //match
+                    p->map[j] = i;                    
+                    tmp = 0;//exit loop
+                    j--;
+                }
+                else
+                {
+                    //next arg name
+                    tmp = strchr(tmp,',');
+                    tmp++;//go to char after ','
+                }
+            }
+            if(j==p->argc_in_path+p->argc)
+            {
+                            printf("\nERROR in config line:\n%s -variable %s not identified in OSC message!\n\n",config,var);
+                            return -1;
+            }
+            //get conditioning, should be pre=b+a* and/or post=*a+b
+            if(strlen(pre))
+            {
+                char s1[4],s2[4];
+                float a,b;
+                switch(sscanf(pre,"%f%[-+* ]%f%[+-* ]",&b,s1,&a,s2))
+                {
+                    case 4:
+                        if(strchr(s2,'*'))//only multiply makes sense here
+                        {
+                            p->scale[i] *= a;
+                        }
+                        else
+                        {
+                            printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
+                            return -1;
+                        }
+                    case 2:
+                        if(strchr(s1,'*'))
+                        {
+                            p->scale[i] *= b;
+                        }
+                        else if(strchr(s1,'+'))
+                        {
+                            p->offset[i] += b;
+                        }
+                        else if(strchr(s1,'-'))
+                        {
+                            p->offset[i] += b;
+                            p->scale[i] *= -1;
+                        }
+                        break;
+                    default:
+                        if(strchr(pre,'-'))
+                        {
+                            p->scale[i] *= -1;
+                        }
+                        else
+                        {
+                           // printf("\nERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
+                            //return -1; 
+                            //just ignore it
+                        }
+                        break;
+                }//switch
+            }//if pre conditions
+            if(strlen(post))
+            {
+                char s1[4],s2[4];
+                float a,b;
+                switch(sscanf(post,"%[-+*/ ]%f%[+- ]%f",s1,&a,s2,&b))
+                {
+                    case 4:
+                        if(strchr(s2,'+'))//only add/subtract makes sense here
+                        {
+                            p->offset[i] += b;
+                        }
+                        else if(strchr(s2,'-'))
+                        {
+                            p->offset[i] -= b;
+                        }
+                        else
+                        {
+                            printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
+                            return -1; 
+                        }
+                    case 2:
+                        if(strchr(s1,'*'))
+                        {
+                            p->scale[i] *= a;
+                        }
+                        else if(strchr(s1,'/'))
+                        {
+                           p->scale[i] /= a; 
+                        }
+                        else if(strchr(s1,'+'))
+                        {
+                            p->offset[i] += a;
+                        }
+                        else if(strchr(s1,'-'))
+                        {
+                            p->offset[i] -= a;
+                        }
+                        break;
+                    default:
+                        //printf("\nERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
+                        //return -1; 
+                        //ignore it
+                        break;
+                }//switch
+                
+            }//if post conditioning
+        }//not global channel
+    }//not constant
+        
+    p->channel = arg[0];
+    p->data1 = arg[1];
+    p->data2 = arg[2];
+    p->opcode += arg[3];
+    p->use[0] = use[0];
+    p->use[1] = use[1];
+    p->use[2] = use[2];
+    
+    return 0;
+}
 
 int get_pair_mapping(char* config, PAIR* p, int n)
 {
@@ -382,7 +588,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
         arg0[70], arg1[70], arg2[70], arg3[70],
         pre[50], var[50], post[50];
     char *tmp, *marg[4];
-    float f,arg[4] = {0,0,0,0};
+    float f,f2,arg[4] = {0,0,0,0}, max[4];
     int i,j,k,use[4] = {0,0,0,0};
 
     arg0[0]=0;
@@ -399,7 +605,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
         argnames[0] = 0;//all constants in midi command
     }
 
-    //lets get those arguments
+    //lets get those midi arguments
     rm_whitespace(argnames);
     strcat(argnames,",");//add trailing comma
     i = sscanf(midiargs,"%[^,],%[^,],%[^,],%[^,]",arg0,arg1,arg2,arg3);
@@ -434,14 +640,24 @@ int get_pair_mapping(char* config, PAIR* p, int n)
         }
         if (strlen(var)==0)
         {
-            //must be a constant
-            if(!sscanf(pre,"%f",&f))
+            //must be a constant or range
+            if(!sscanf(pre,"%f%*[- ]%f",&f,&f2))
             {
-                printf("\nERROR in config line:\n%s -could not get constant arg %i in midi command\n\n",config,i);
-                return -1;
+                //range
+                arg[i] = f;
+                use[i] = 2;
             }
-            arg[i] = (uint8_t)f;
-            use[i] = 1;
+            else
+            {
+                //constant
+                if(!sscanf(pre,"%f",&f))
+                {
+                    printf("\nERROR in config line:\n%s -could not get constant arg %i in midi command\n\n",config,i);
+                    return -1;
+                }
+                arg[i] = (uint8_t)f;
+                use[i] = 1;
+            }
         }
         else//not a constant
         {

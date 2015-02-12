@@ -13,3 +13,14 @@
 /grid/{80-95} i, state : note( channel, 76, velocity, state);
 /grid/{96-111} i, state : note( channel, 74, velocity, state);
 /grid/{112-127} i, state : note( channel, 72, velocity, state);
+
+
+#or probably
+/grid/{i} i, 0-15, state : note( channel, 84, velocity, state);
+/grid/{i} i, 16-31, state : note( channel, 83, velocity, state);
+/grid/{i} i, 32-47, state : note( channel, 81, velocity, state);
+/grid/{i} i, 48-63, state : note( channel, 79, velocity, state);
+/grid/{i} i, 64-79, state : note( channel, 77, velocity, state);
+/grid/{i} i, 80-95, state : note( channel, 76, velocity, state);
+/grid/{i} i, 96-111, state : note( channel, 74, velocity, state);
+/grid/{i} i, 112-127, state : note( channel, 72, velocity, state);
