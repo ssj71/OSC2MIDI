@@ -21,14 +21,18 @@ typedef struct _PAIR
     char* types;
     
     //conversion factors
-    int8_t* map;            //which byte in the midi message by index of var in OSC message (including in path args)
+    int8_t map[];            //which byte in the midi message by index of var in OSC message (including in path args)
     float scale[4];         //scale factor for each argument going into the midi message
     float offset[4];        //linear offset for each arg going to midi message
-    float midi_rangemin[4]; //range bounds for midi args
-    float midi_rangemax[4]; //
-    float osc_rangemin[];   //range bounds for osc args
-    float osc_rangemax[];   //
-    float osc_const[];      //constant values for osc args
+
+    //midi constants 0- channel 1- data1 2- data2
+    uint8_t opcode;
+    uint8_t midi_rangemax[3]; //range bound for midi args (or same as val)
+    uint8_t midi_val[3];  //constant values in midi args (or min of range)
+
+    //osc constants
+    float osc_rangemax[];   //range bounds for osc args (or same as val)
+    float osc_val[];      //constant values for osc args (or min of range)
 
     //flags
     uint8_t use_glob_chan;  //flag decides if using global channel (1) or if its specified by message (0)
@@ -37,13 +41,8 @@ typedef struct _PAIR
     uint8_t set_velocity;   //flag if message is actually control message to change global velocity
     uint8_t set_shift;      //flag if message is actually control message to change filter shift value
     uint8_t raw_midi;       //flag if message sends osc datatype of midi message
-    uint8_t use[3];         //flags for midi message (channel, data1, data2) is a constant (1) or range (2)
-
-    //midi data
-    uint8_t opcode;
-    uint8_t channel;
-    uint8_t data1;
-    uint8_t data2;
+    uint8_t midi_const[3];  //flags for midi message (channel, data1, data2) is a constant (1) or range (2)
+    uint8_t osc_const[];    //flags for osc args that are constant (1) or range (2)
 
 }PAIR;
 
@@ -69,6 +68,7 @@ void print_pair(PAIRHANDLE ph)
     //arg names
     for(i=0;i<p->argc_in_path;i++)
     {
+        //TODO: check here for osc constants/ranges
         printf("%c, ",'a'+i);
     }
     for(;i<p->argc+p->argc_in_path;i++)
@@ -92,14 +92,15 @@ void print_pair(PAIRHANDLE ph)
         printf(" channel");
 
     //midi arg 0 
-    if(p->use[0])printf(" %i",p->channel);
+    //TODO: if const check if range too
+    if(p->midi_const[0])printf(" %i",p->midi_val[0]);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=0;i++);
     if(i<p->argc+p->argc_in_path)
         printf("%.2f*%c + %.2f",p->scale[0],'a'+i,p->offset[0]);
     
     
     //midi arg1 
-    if(p->use[1])printf(", %i",p->data1);
+    if(p->midi_const[1])printf(", %i",p->midi_val[1]);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=1;i++);
     if(i<p->argc+p->argc_in_path)
         printf(", %.2f*%c + %.2f",p->scale[1],'a'+i,p->offset[1]);
@@ -107,7 +108,7 @@ void print_pair(PAIRHANDLE ph)
     //midi arg2
     if(p->use_glob_vel)
         printf(", velocity");
-    if(p->use[2])printf(", %i",p->data2);
+    if(p->midi_const[2])printf(", %i",p->midi_val[2]);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=2;i++);
     if(i<p->argc+p->argc_in_path)
         printf(", %.2f*%c + %.2f",p->scale[2],'a'+i,p->offset[2]);
@@ -334,28 +335,28 @@ int get_pair_midicommand(char* config, PAIR* p)
     else if(strstr(midicommand,"midimessage"))
     {
         p->opcode = 0x01;
-        p->channel = 0xFF;
+        p->midi_val[0] = 0xFF;
         n = 1;
     }
     //non-midi commands
     else if(strstr(midicommand,"setchannel"))
     {
         p->opcode = 0x02;
-        p->channel = 0xFE;
+        p->midi_val[0] = 0xFE;
         n = 1;
         p->set_channel = 1;
     }
     else if(strstr(midicommand,"setvelocity"))
     {
         p->opcode = 0x03;
-        p->channel = 0xFD;
+        p->midi_val[0] = 0xFD;
         n = 1;
         p->set_velocity = 1;
     }
     else if(strstr(midicommand,"setshift"))
     {
         p->opcode = 0x04;
-        p->channel = 0xFC;
+        p->midi_val[0] = 0xFC;
         n = 1;
         p->set_shift = 1;
     }
@@ -367,6 +368,190 @@ int get_pair_midicommand(char* config, PAIR* p)
     return n;
 }
 
+
+//this checks if it is a constant or range and returns val and rangemax
+//accordingly. val will be the min for the range
+int get_pair_arg_constant(char* arg, float* val, float* rangemax)
+{
+    //must be a constant or range
+    if(!sscanf(arg,"%f%*[- ]%f",&val,&rangemax))
+    {
+        //range
+        return 2;
+    }
+    else
+    {
+        //constant
+        if(!sscanf(arg,"%f",&val))
+        {
+            *val = 0;
+            *rangemax = 0;
+            return 0;
+        }
+        *rangemax = *val;
+        return 1;
+    }
+
+}
+
+//these are used to find the actual mapping
+int get_pair_arg_varname(char* arg, char* varname)
+{
+    //just get the name and return if successful
+    int j;
+    if( !(j = sscanf(tmp,"%*[.1234567890*/+- ]%[^*/+- ]%*[.1234567890*/+- ]",varname)) )
+    {
+        j = sscanf(tmp,"%[^*/+- ]%*[.1234567890*/+- ]",varname);
+    }
+    reutrn j;
+}
+int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc)
+{
+    //find where it is in the OSC message
+    uint8_t j;
+    char name[50] = "";
+    int j,k = strlen(varname);
+    char* tmp = oscargs;
+    for(j=0;j<argc;j++)
+    {
+        if(get_pair_arg_varname(tmp, name))
+        {
+            if(!strncmp(varname,name,k) && sscanf(tmp+k,"%[ +-*/,]",name))//check if names match and it is the same length
+            {
+                //it's a match
+                p->map[j] = i;                    
+                return j;
+            }
+        }
+        else
+        {
+            //next arg name
+            tmp = strchr(tmp,',');
+            tmp++;//go to char after ','
+        }
+    }
+    if(j == argc)
+    {
+        //TODO move error reports to whevere this function is called (we don't know config here)
+        //printf("\nERROR in config line:\n%s -variable %s not identified in OSC message!\n\n",config,var);
+        return -1;
+    }
+}
+
+//this function assumes scale and offset are initialized to 1 and 0 (or more appropriate numbers)
+//it will simpy add in (or multiply in) the values found here
+//it will populate the varname string so it must have memory allocated
+int get_pair_arg_conditioning(char* arg, char* varname, float* _scale, float* _offset)
+{
+    char pre[50], post[50];
+    uint8_t j;
+    float scale = 1, offset = 0;
+    if( !(j = sscanf(arg,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,varname,post)) )
+    {
+        j = sscanf(arg,"%[^*/+- ]%[.1234567890*/+- ]",varname,post);
+    }
+    if(!j)
+    {
+        printf("\nERROR -could not parse arg!\n");
+        return -1;
+    }
+    //get conditioning, should be pre=b+a* and/or post=*a+b
+    if(strlen(pre))
+    {
+        char s1[20],s2[20];
+        float a,b;
+        switch(sscanf(pre,"%f%[-+* ]%f%[+-* ]",&b,s1,&a,s2))
+        {
+            case 4:
+                if(strchr(s2,'*'))//only multiply makes sense here
+                {
+                    scale *= a;
+                }
+                else
+                {
+                    printf("\nERROR -could not get pre conditioning! nonsensical operator?\n");
+                    return -1;
+                }
+            case 3:
+                //if its not whitespace, its nonsensical, we'll ignore it
+            case 2:
+                if(strchr(s1,'*'))
+                {
+                    scale *= b;
+                }
+                else if(strchr(s1,'+'))
+                {
+                    offset += b;
+                }
+                else if(strchr(s1,'-'))
+                {
+                    offset += b;
+                    scale *= -1;
+                }
+                break;
+            default:
+                if(strchr(pre,'-'))
+                {
+                    scale *= -1;
+                }
+                else
+                {
+                    //if its not whitespace, its nonsensical, we'll ignore it
+                }
+                break;
+        }//switch
+    }//if pre conditions
+    if(strlen(post))
+    {
+        char s1[20],s2[20];
+        float a,b;
+        switch(sscanf(post,"%[-+*/ ]%f%[+- ]%f",s1,&a,s2,&b))
+        {
+            case 4:
+                if(strchr(s2,'+'))//only add/subtract makes sense here
+                {
+                    offset += b;
+                }
+                else if(strchr(s2,'-'))
+                {
+                    offset -= b;
+                }
+                else
+                {
+                    printf("\nERROR -could not get post conditioning! nonsensical operator?\n");
+                    return -1; 
+                }
+            case 3:
+                //if its not whitespace, its nonsensical, we'll ignore it
+            case 2:
+                if(strchr(s1,'*'))
+                {
+                    scale *= a;
+                }
+                else if(strchr(s1,'/'))
+                {
+                    scale /= a; 
+                }
+                else if(strchr(s1,'+'))
+                {
+                    offset += a;
+                }
+                else if(strchr(s1,'-'))
+                {
+                    offset -= a;
+                }
+                break;
+            default:
+                //if its not whitespace, its nonsensical, we'll ignore it
+                break;
+        }//switch
+        
+    }//if post conditioning
+    *_scale *= scale;
+    *_offset *= offset;
+}
+
+
 //for each midi args
 //  check if constant, range or keyword (glob chan etc)
 //  else go through osc args to find match
@@ -374,205 +559,11 @@ int get_pair_midicommand(char* config, PAIR* p)
 //for each osc arg
 //  if not used, check if constant
 //  if used get conditioning
-
-//TODO: add get_pair_arg_varname, get_pair_constant_arg, get_pair_osc_arg_index
-int get_pair_arg_format(char* arg, PAIR* p, uint8_t oscarg, uint8_t index)
-{
-    uint8_t i = index;
-
-    p->scale[i] = 1;
-    p->offset[i] = 0;
-    pre[0] = 0;
-    var[0] = 0;
-    post[0] = 0;
-
-    tmp = arg;
-    if( !(j = sscanf(tmp,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,var,post)) )
-    {
-        j = sscanf(tmp,"%[^*/+- ]%[.1234567890*/+- ]",var,post);
-    }
-    if(!j)
-    {
-        printf("\nERROR in config line:\n%s -could not understand arg %i in midi command\n\n",config,i);
-        return -1;
-    }
-    if (strlen(var)==0)
-    {
-        //must be a constant or range
-        if(!sscanf(pre,"%f%*[- ]%f",&f,&f2))
-        {
-            //range TODO: store max and min
-            arg[i] = f;
-            use[i] = 2;
-        }
-        else
-        {
-            //constant
-            if(!sscanf(pre,"%f",&f))
-            {
-                printf("\nERROR in config line:\n%s -could not get constant arg %i in midi command\n\n",config,i);
-                return -1;
-            }
-            arg[i] = (uint8_t)f;
-            use[i] = 1;
-        }
-    }
-    else//not a constant
-    {
-        //check if its the global channel keyword
-        if(!strncmp(var,"channel",7))
-        {
-            p->use_glob_chan = 1;
-            p->scale[i] = 1;
-            p->offset[i] = 0;
-            arg[i] = 0;
-            use[i] = 0;
-        }
-        else if(!strncmp(var,"velocity",8))
-        {
-            p->use_glob_vel = 1;
-            p->scale[i] = 1;
-            p->offset[i] = 0;
-            arg[i] = 0;
-            use[i] = 0;
-        }
-        else
-        {
-            //find where it is in the OSC message
-            k = strlen(var);
-            tmp = argnames;
-            for(j=0;(j<p->argc_in_path+p->argc) && tmp;j++)
-            {
-                if(!strncmp(var,tmp,k) && *(tmp+k) == ',')
-                {
-                    //match
-                    p->map[j] = i;                    
-                    tmp = 0;//exit loop
-                    j--;
-                }
-                else
-                {
-                    //next arg name
-                    tmp = strchr(tmp,',');
-                    tmp++;//go to char after ','
-                }
-            }
-            if(j==p->argc_in_path+p->argc)
-            {
-                            printf("\nERROR in config line:\n%s -variable %s not identified in OSC message!\n\n",config,var);
-                            return -1;
-            }
-            //get conditioning, should be pre=b+a* and/or post=*a+b
-            if(strlen(pre))
-            {
-                char s1[4],s2[4];
-                float a,b;
-                switch(sscanf(pre,"%f%[-+* ]%f%[+-* ]",&b,s1,&a,s2))
-                {
-                    case 4:
-                        if(strchr(s2,'*'))//only multiply makes sense here
-                        {
-                            p->scale[i] *= a;
-                        }
-                        else
-                        {
-                            printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
-                            return -1;
-                        }
-                    case 2:
-                        if(strchr(s1,'*'))
-                        {
-                            p->scale[i] *= b;
-                        }
-                        else if(strchr(s1,'+'))
-                        {
-                            p->offset[i] += b;
-                        }
-                        else if(strchr(s1,'-'))
-                        {
-                            p->offset[i] += b;
-                            p->scale[i] *= -1;
-                        }
-                        break;
-                    default:
-                        if(strchr(pre,'-'))
-                        {
-                            p->scale[i] *= -1;
-                        }
-                        else
-                        {
-                           // printf("\nERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
-                            //return -1; 
-                            //just ignore it
-                        }
-                        break;
-                }//switch
-            }//if pre conditions
-            if(strlen(post))
-            {
-                char s1[4],s2[4];
-                float a,b;
-                switch(sscanf(post,"%[-+*/ ]%f%[+- ]%f",s1,&a,s2,&b))
-                {
-                    case 4:
-                        if(strchr(s2,'+'))//only add/subtract makes sense here
-                        {
-                            p->offset[i] += b;
-                        }
-                        else if(strchr(s2,'-'))
-                        {
-                            p->offset[i] -= b;
-                        }
-                        else
-                        {
-                            printf("\nERROR in config line:\n%s -could not get conditioning in MIDI arg %i!\n\n",config,i);
-                            return -1; 
-                        }
-                    case 2:
-                        if(strchr(s1,'*'))
-                        {
-                            p->scale[i] *= a;
-                        }
-                        else if(strchr(s1,'/'))
-                        {
-                           p->scale[i] /= a; 
-                        }
-                        else if(strchr(s1,'+'))
-                        {
-                            p->offset[i] += a;
-                        }
-                        else if(strchr(s1,'-'))
-                        {
-                            p->offset[i] -= a;
-                        }
-                        break;
-                    default:
-                        //printf("\nERROR in config line: %s, could not get conditioning in MIDI arg %i!\n",config,i);
-                        //return -1; 
-                        //ignore it
-                        break;
-                }//switch
-                
-            }//if post conditioning
-        }//not global channel
-    }//not constant
-        
-    p->channel = arg[0];
-    p->data1 = arg[1];
-    p->data2 = arg[2];
-    p->opcode += arg[3];
-    p->use[0] = use[0];
-    p->use[1] = use[1];
-    p->use[2] = use[2];
-    
-    return 0;
-}
-
 int get_pair_mapping(char* config, PAIR* p, int n)
 {
     char argnames[200],midiargs[200],
         arg0[70], arg1[70], arg2[70], arg3[70],
-        pre[50], var[50], post[50];
+        var[50];
     char *tmp, *marg[4];
     float f,f2,arg[4] = {0,0,0,0}, max[4];
     int i,j,k,use[4] = {0,0,0,0};
@@ -610,20 +601,41 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     {
         p->scale[i] = 1;
         p->offset[i] = 0;
-        pre[0] = 0;
-        var[0] = 0;
-        post[0] = 0;
-
-        tmp = marg[i];
-        if( !(j = sscanf(tmp,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,var,post)) )
+//        pre[0] = 0;
+//        var[0] = 0;
+//        post[0] = 0;
+//
+//        tmp = marg[i];
+//        if( !(j = sscanf(tmp,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,var,post)) )
+//        {
+//            j = sscanf(tmp,"%[^*/+- ]%[.1234567890*/+- ]",var,post);
+//        }
+//        if(!j)
+//        {
+//            printf("\nERROR in config line:\n%s -could not understand arg %i in midi command\n\n",config,i);
+//            return -1;
+//        }
+        if(get_pair_arg_constant(marg[i],&f,&f2))
         {
-            j = sscanf(tmp,"%[^*/+- ]%[.1234567890*/+- ]",var,post);
+            //it's constant
+            if(i == 3)
+            {
+                //for some reason they used the "note" command but then put a constant in whether it is on or off
+                if(f)p->opcode+=0x10;
+            }
+            else
+            {
+                p->midi_val[i] = (uint8_t)f;
+                p->midi_rangemax = (uint8_t)f2;
+            }
         }
-        if(!j)
+        else if(-1 == get_pair_arg_conditioning(marg[i], var, &p->scale[i], &p->offset[i]))
         {
             printf("\nERROR in config line:\n%s -could not understand arg %i in midi command\n\n",config,i);
             return -1;
         }
+        //TODO: get mapping
+        /*
         if (strlen(var)==0)
         {
             //must be a constant or range
@@ -740,7 +752,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                 {
                     char s1[20],s2[20];
                     float a,b;
-                    switch(sscanf(post,"%[-+*/ ]%f%[+- ]%f",s1,&a,s2,&b))
+                    switch(sscanf(post,"%[-+/* ]%f%[+- ]%f",s1,&a,s2,&b))
                     {
                         case 4:
                             if(strchr(s2,'+'))//only add/subtract makes sense here
@@ -784,14 +796,15 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                 }//if post conditioning
             }//not global channel
         }//not constant
+        */
     }//for each arg
-    p->channel = arg[0];
-    p->data1 = arg[1];
-    p->data2 = arg[2];
+    p->midi_val[0] = arg[0];
+    p->midi_val[1] = arg[1];
+    p->midi_val[2] = arg[2];
     p->opcode += arg[3];
-    p->use[0] = use[0];
-    p->use[1] = use[1];
-    p->use[2] = use[2];
+    p->midi_const[0] = use[0];
+    p->midi_const[1] = use[1];
+    p->midi_const[2] = use[2];
     
     return 0;
 }
@@ -831,9 +844,9 @@ PAIRHANDLE alloc_pair(char* config)
     p->argc = 0;
     p->raw_midi = 0;
     p->opcode = 0;
-    p->channel = 0;
-    p->data1 = 0;
-    p->data2 = 0;
+    p->midi_val[0] = 0;
+    p->midi_val[1] = 0;
+    p->midi_val[2] = 0;
 
     //config into separate parts
     if(-1 == get_pair_path(config,p))
@@ -885,9 +898,9 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
 
 
     //set defaults / static data
-    msg[0] = p->opcode + p->channel;
-    msg[1] = p->data1;
-    msg[2] = p->data2;
+    msg[0] = p->opcode + p->midi_val[0];
+    msg[1] = p->midi_val[1];
+    msg[2] = p->midi_val[2];
     if(p->use_glob_chan)
     {
         msg[0] += *glob_chan;
@@ -1132,17 +1145,17 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         {
             return 0;
         }
-        else if(p->use[0] && (msg[0]&0x0F) != p->channel)
+        else if(p->midi_const[0] && (msg[0]&0x0F) != p->midi_const_val[0])
         {
             return 0;
         }
         
-        if(p->use[1] && msg[1] != p->data1)
+        if(p->midi_const[1] && msg[1] != p->midi_const_val[1])
         {
             return 0;
         }
 
-        if(p->use[2] && msg[2] != p->data2)
+        if(p->midi_const[2] && msg[2] != p->midi_const_val[2])
         {
             return 0;
         }
