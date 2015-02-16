@@ -419,7 +419,6 @@ int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc)
             if(!strncmp(varname,name,k) && sscanf(tmp+k,"%[ +-*/,]",name))//check if names match and it is the same length
             {
                 //it's a match
-                p->map[j] = i;                    
                 return j;
             }
         }
@@ -432,6 +431,7 @@ int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc)
     }
     if(j == argc)
     {
+        //var is not used
         //TODO move error reports to whevere this function is called (we don't know config here)
         //printf("\nERROR in config line:\n%s -variable %s not identified in OSC message!\n\n",config,var);
         return -1;
@@ -565,8 +565,8 @@ int get_pair_mapping(char* config, PAIR* p, int n)
         arg0[70], arg1[70], arg2[70], arg3[70],
         var[50];
     char *tmp, *marg[4];
-    float f,f2,arg[4] = {0,0,0,0}, max[4];
-    int i,j,k,use[4] = {0,0,0,0};
+    float f,f2;
+    int i,j;
 
     arg0[0]=0;
     arg1[0]=0;
@@ -601,20 +601,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     {
         p->scale[i] = 1;
         p->offset[i] = 0;
-//        pre[0] = 0;
-//        var[0] = 0;
-//        post[0] = 0;
-//
-//        tmp = marg[i];
-//        if( !(j = sscanf(tmp,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,var,post)) )
-//        {
-//            j = sscanf(tmp,"%[^*/+- ]%[.1234567890*/+- ]",var,post);
-//        }
-//        if(!j)
-//        {
-//            printf("\nERROR in config line:\n%s -could not understand arg %i in midi command\n\n",config,i);
-//            return -1;
-//        }
+
         if(get_pair_arg_constant(marg[i],&f,&f2))
         {
             //it's constant
@@ -626,185 +613,58 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             else
             {
                 p->midi_val[i] = (uint8_t)f;
-                p->midi_rangemax = (uint8_t)f2;
+                p->midi_rangemax[i] = (uint8_t)f2;
             }
         }
-        else if(-1 == get_pair_arg_conditioning(marg[i], var, &p->scale[i], &p->offset[i]))
+        else if(-1 == get_pair_arg_conditioning(marg[i], var, &p->scale[i], &p->offset[i]))//get conditioning for midi arg
         {
             printf("\nERROR in config line:\n%s -could not understand arg %i in midi command\n\n",config,i);
             return -1;
-        }
-        //TODO: get mapping
-        /*
-        if (strlen(var)==0)
+        } 
+        else if(!strncmp(var,"channel",7))//check if its the global channel keyword
         {
-            //must be a constant or range
-            if(!sscanf(pre,"%f%*[- ]%f",&f,&f2))
+            p->use_glob_chan = 1;
+            p->scale[i] = 1; //should these global vars be able to be scaled?
+            p->offset[i] = 0;
+            p->midi_val[i] = p->midi_rangemax[i] = 0;
+            p->midi_const[i] = 0;
+        }
+        else if(!strncmp(var,"velocity",8))
+        {
+            p->use_glob_vel = 1;
+            p->scale[i] = 1;
+            p->offset[i] = 0;
+            p->midi_val[i] = p->midi_rangemax[i] = 0;
+            p->midi_const[i] = 0;
+        }
+        else
+        {
+            //get mapping
+            j = get_pair_osc_arg_index(var, argnames, p->argc_in_path + p->argc);
+            if(j >=0)
             {
-                //range
-                arg[i] = f;
-                use[i] = 2;
+                p->map[j] = i;
+                p->midi_val[i] = p->midi_rangemax[i] = 0;
+                p->midi_const[i] = 0;
             }
             else
             {
-                //constant
-                if(!sscanf(pre,"%f",&f))
-                {
-                    printf("\nERROR in config line:\n%s -could not get constant arg %i in midi command\n\n",config,i);
-                    return -1;
-                }
-                arg[i] = (uint8_t)f;
-                use[i] = 1;
+                printf("\nERROR in config line:\n%s -variable %s not identified in OSC message but used for midi arg!\n\n",config,var);
+                return -1;
             }
-        }
-        else//not a constant
+        } 
+    }//for each midi arg
+    for(i=0; i<p->argc_in_path + p->argc;i++)
+    {
+        if(p->map[i] == -1)
         {
-            //check if its the global channel keyword
-            if(!strncmp(var,"channel",7))
-            {
-                p->use_glob_chan = 1;
-                p->scale[i] = 1;
-                p->offset[i] = 0;
-                arg[i] = 0;
-                use[i] = 0;
-            }
-            else if(!strncmp(var,"velocity",8))
-            {
-                p->use_glob_vel = 1;
-                p->scale[i] = 1;
-                p->offset[i] = 0;
-                arg[i] = 0;
-                use[i] = 0;
-            }
-            else
-            {
-                //find where it is in the OSC message
-                k = strlen(var);
-                tmp = argnames;
-                for(j=0;(j<p->argc_in_path+p->argc) && tmp;j++)
-                {
-                    if(!strncmp(var,tmp,k) && *(tmp+k) == ',')
-                    {
-                        //match
-                        p->map[j] = i;                    
-                        tmp = 0;//exit loop
-                        j--;
-                    }
-                    else
-                    {
-                        //next arg name
-                        tmp = strchr(tmp,',');
-                        tmp++;//go to char after ','
-                    }
-                }
-                if(j==p->argc_in_path+p->argc)
-                {
-                                printf("\nERROR in config line:\n%s -variable %s not identified in OSC message!\n\n",config,var);
-                                return -1;
-                }
-                //get conditioning, should be pre=b+a* and/or post=*a+b
-                if(strlen(pre))
-                {
-                    char s1[20],s2[20];
-                    float a,b;
-                    switch(sscanf(pre,"%f%[-+* ]%f%[+-* ]",&b,s1,&a,s2))
-                    {
-                        case 4:
-                            if(strchr(s2,'*'))//only multiply makes sense here
-                            {
-                                p->scale[i] *= a;
-                            }
-                            else
-                            {
-                                printf("\nERROR in config line:\n%s -could not get pre conditioning in MIDI arg %i! nonsensical operator?\n\n",config,i);
-                                return -1;
-                            }
-                        case 3:
-                            //if its not whitespace, its nonsensical, we'll ignore it
-                        case 2:
-                            if(strchr(s1,'*'))
-                            {
-                                p->scale[i] *= b;
-                            }
-                            else if(strchr(s1,'+'))
-                            {
-                                p->offset[i] += b;
-                            }
-                            else if(strchr(s1,'-'))
-                            {
-                                p->offset[i] += b;
-                                p->scale[i] *= -1;
-                            }
-                            break;
-                        default:
-                            if(strchr(pre,'-'))
-                            {
-                                p->scale[i] *= -1;
-                            }
-                            else
-                            {
-                                //if its not whitespace, its nonsensical, we'll ignore it
-                            }
-                            break;
-                    }//switch
-                }//if pre conditions
-                if(strlen(post))
-                {
-                    char s1[20],s2[20];
-                    float a,b;
-                    switch(sscanf(post,"%[-+/* ]%f%[+- ]%f",s1,&a,s2,&b))
-                    {
-                        case 4:
-                            if(strchr(s2,'+'))//only add/subtract makes sense here
-                            {
-                                p->offset[i] += b;
-                            }
-                            else if(strchr(s2,'-'))
-                            {
-                                p->offset[i] -= b;
-                            }
-                            else
-                            {
-                                printf("\nERROR in config line:\n%s -could not get post conditioning in MIDI arg %i! nonsensival operator?\n\n",config,i);
-                                return -1; 
-                            }
-                        case 3:
-                            //if its not whitespace, its nonsensical, we'll ignore it
-                        case 2:
-                            if(strchr(s1,'*'))
-                            {
-                                p->scale[i] *= a;
-                            }
-                            else if(strchr(s1,'/'))
-                            {
-                               p->scale[i] /= a; 
-                            }
-                            else if(strchr(s1,'+'))
-                            {
-                                p->offset[i] += a;
-                            }
-                            else if(strchr(s1,'-'))
-                            {
-                                p->offset[i] -= a;
-                            }
-                            break;
-                        default:
-                            //if its not whitespace, its nonsensical, we'll ignore it
-                            break;
-                    }//switch
-                    
-                }//if post conditioning
-            }//not global channel
-        }//not constant
-        */
-    }//for each arg
-    p->midi_val[0] = arg[0];
-    p->midi_val[1] = arg[1];
-    p->midi_val[2] = arg[2];
-    p->opcode += arg[3];
-    p->midi_const[0] = use[0];
-    p->midi_const[1] = use[1];
-    p->midi_const[2] = use[2];
+            //it's  used, check if it is  conditioned
+        }
+        else
+        {
+            //it's not used, check if it is constant or range TODO: or keyword?
+        }
+    }
     
     return 0;
 }
