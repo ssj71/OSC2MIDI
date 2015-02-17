@@ -21,7 +21,7 @@ typedef struct _PAIR
     char* types;
     
     //conversion factors
-    int8_t map[];            //which byte in the midi message by index of var in OSC message (including in path args)
+    int8_t *map;            //which byte in the midi message by index of var in OSC message (including in path args)
     float scale[4];         //scale factor for each argument going into the midi message
     float offset[4];        //linear offset for each arg going to midi message
 
@@ -31,8 +31,8 @@ typedef struct _PAIR
     uint8_t midi_val[3];  //constant values in midi args (or min of range)
 
     //osc constants
-    float osc_rangemax[];   //range bounds for osc args (or same as val)
-    float osc_val[];      //constant values for osc args (or min of range)
+    float *osc_rangemax;   //range bounds for osc args (or same as val)
+    float *osc_val;      //constant values for osc args (or min of range)
 
     //flags
     uint8_t use_glob_chan;  //flag decides if using global channel (1) or if its specified by message (0)
@@ -42,7 +42,7 @@ typedef struct _PAIR
     uint8_t set_shift;      //flag if message is actually control message to change filter shift value
     uint8_t raw_midi;       //flag if message sends osc datatype of midi message
     uint8_t midi_const[3];  //flags for midi message (channel, data1, data2) is a constant (1) or range (2)
-    uint8_t osc_const[];    //flags for osc args that are constant (1) or range (2)
+    uint8_t *osc_const;    //flags for osc args that are constant (1) or range (2)
 
 }PAIR;
 
@@ -221,9 +221,14 @@ int get_pair_argtypes(char* config, PAIR* p)
         strcpy(argtypes,"");
     }
 
-    //now get the argument types
+    //allocate space for the number of arguments
     p->types = (char*)malloc( sizeof(char) * (strlen(argtypes)+1) );
-    p->map = (signed char*)malloc( sizeof(char) * (p->argc_in_path+strlen(argtypes)+1) );
+    p->map = (int8_t*)malloc( sizeof(int8_t) * (p->argc_in_path+strlen(argtypes)+1) );
+    p->osc_const = (uint8_t*)malloc( sizeof(uint8_t) * (p->argc_in_path+strlen(argtypes)+1) );
+    p->osc_val = (float*)malloc( sizeof(float) * (p->argc_in_path+strlen(argtypes)+1) );
+    p->osc_rangemax = (float*)malloc( sizeof(float) * (p->argc_in_path+strlen(argtypes)+1) );
+
+    //now get the argument types
     for(i=0;i<strlen(argtypes);i++)
     {
         switch(argtypes[i])
@@ -374,7 +379,7 @@ int get_pair_midicommand(char* config, PAIR* p)
 int get_pair_arg_constant(char* arg, float* val, float* rangemax)
 {
     //must be a constant or range
-    if(!sscanf(arg,"%f%*[- ]%f",&val,&rangemax))
+    if(!sscanf(arg,"%f%*[- ]%f",val,rangemax))
     {
         //range
         return 2;
@@ -382,7 +387,7 @@ int get_pair_arg_constant(char* arg, float* val, float* rangemax)
     else
     {
         //constant
-        if(!sscanf(arg,"%f",&val))
+        if(!sscanf(arg,"%f",val))
         {
             *val = 0;
             *rangemax = 0;
@@ -390,8 +395,7 @@ int get_pair_arg_constant(char* arg, float* val, float* rangemax)
         }
         *rangemax = *val;
         return 1;
-    }
-
+    } 
 }
 
 //these are used to find the actual mapping
@@ -399,27 +403,27 @@ int get_pair_arg_varname(char* arg, char* varname)
 {
     //just get the name and return if successful
     int j;
-    if( !(j = sscanf(tmp,"%*[.1234567890*/+- ]%[^*/+- ]%*[.1234567890*/+- ]",varname)) )
+    if( !(j = sscanf(arg,"%*[.1234567890*/+- ]%[^*/+- ]%*[.1234567890*/+- ]",varname)) )
     {
-        j = sscanf(tmp,"%[^*/+- ]%*[.1234567890*/+- ]",varname);
+        j = sscanf(arg,"%[^*/+- ]%*[.1234567890*/+- ]",varname);
     }
-    reutrn j;
+    return j;
 }
 int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc)
 {
     //find where it is in the OSC message
-    uint8_t j;
+    uint8_t i;
     char name[50] = "";
-    int j,k = strlen(varname);
+    int k = strlen(varname);
     char* tmp = oscargs;
-    for(j=0;j<argc;j++)
+    for(i=0;i<argc;i++)
     {
         if(get_pair_arg_varname(tmp, name))
         {
             if(!strncmp(varname,name,k) && sscanf(tmp+k,"%[ +-*/,]",name))//check if names match and it is the same length
             {
                 //it's a match
-                return j;
+                return i;
             }
         }
         else
@@ -429,13 +433,12 @@ int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc)
             tmp++;//go to char after ','
         }
     }
-    if(j == argc)
+    if(i == argc)
     {
         //var is not used
-        //TODO move error reports to whevere this function is called (we don't know config here)
-        //printf("\nERROR in config line:\n%s -variable %s not identified in OSC message!\n\n",config,var);
         return -1;
     }
+    return i;
 }
 
 //this function assumes scale and offset are initialized to 1 and 0 (or more appropriate numbers)
@@ -549,6 +552,7 @@ int get_pair_arg_conditioning(char* arg, char* varname, float* _scale, float* _o
     }//if post conditioning
     *_scale *= scale;
     *_offset *= offset;
+    return 0;
 }
 
 
@@ -654,16 +658,41 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             }
         } 
     }//for each midi arg
+
+    //now go through OSC args
+    tmp = argnames;
     for(i=0; i<p->argc_in_path + p->argc;i++)
     {
+        p->osc_val[i] = 0;
+        p->osc_rangemax[i] = 0;
+        p->osc_const[i] = 0;
         if(p->map[i] == -1)
         {
             //it's  used, check if it is  conditioned
+            float scale=1, offset=0;
+            if(-1 == get_pair_arg_conditioning(tmp, var, &scale, &offset))//get conditioning for midi arg
+            {
+                printf("\nERROR in config line:\n%s could not get OSC arg conditioning for arg %i!\n\n",config,i); 
+                return -1;
+            } 
+            //scale and offset are inverted in osc
+            p->scale[i] /= scale;
+            p->offset[i] -= offset;
         }
         else
         {
-            //it's not used, check if it is constant or range TODO: or keyword?
+            //it's not used, check if it is constant or range
+            if(get_pair_arg_constant(marg[i],&f,&f2))
+            {
+                p->osc_const[i] = 1;
+                p->osc_val[i] = f;
+                p->osc_rangemax[i] = f2;
+            }
+            //else it's just some unused variable
         }
+        //next arg name
+        tmp = strchr(tmp,',');
+        tmp++;//go to char after ','
     }
     
     return 0;
@@ -676,6 +705,9 @@ PAIRHANDLE abort_pair_alloc(int step, PAIR* p)
         case 3:
             free(p->types);
             free(p->map);
+            free(p->osc_const);
+            free(p->osc_val);
+            free(p->osc_rangemax);
         case 2:
             while(p->argc_in_path >=0)
             {
@@ -733,6 +765,9 @@ void free_pair(PAIRHANDLE ph)
     PAIR* p = (PAIR*)ph;
     free(p->types);
     free(p->map);
+    free(p->osc_const);
+    free(p->osc_val);
+    free(p->osc_rangemax);
     while(p->argc_in_path >=0)
     {
         free(p->path[p->argc_in_path--]);
@@ -781,7 +816,6 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
         tmp = strstr(path,p->path[i]);  
         n = strlen(p->path[i]);
         p->path[i][p->perc[i]] = '%';
-        //if(!tmp || strncmp(tmp,p->path[i],n))
         if( !tmp )
         {
             return 0;
@@ -801,8 +835,13 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                 msg[place+1] += (uint8_t)((p->scale[place]*v + p->offset[place])/128.0); 
             }
         }
+        //check if it matches range or constant
+        else if(p->osc_const[i] && (v < p->osc_val[i] || v > p->osc_rangemax[i]))
+        {
+            //out of bounds of range or const
+            return 0;
+        }
         path += n;
-        //path = tmp;
     }
     //compare the end of the path
     n = strlen(p->path[i]);
@@ -818,9 +857,6 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
             return 0;
         }
     }
-    //n = strlen(p->path[i]);
-    //if(strncmp(tmp,p->path[i],n) )
-
 
     //now the actual osc args
     double val;
@@ -897,6 +933,7 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                 *filter = msg[place+1];
                 return -1;
             }
+            //put it in the midi message
             if(place == 3)//only used for note on or off
             {
                 msg[0] += ((uint8_t)(p->scale[place]*val + p->offset[place])>0)<<4;
@@ -910,6 +947,49 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                 }
             }
         }//if arg is used
+        else if(p->osc_const[i+p->argc_in_path])
+        {
+            //arg not used but need to check if it matches constant or range
+            switch(types[i])
+            {
+                case 'i':
+                    val = (double)argv[i]->i;
+                    break;
+                case 'h'://long
+                    val = (double)argv[i]->h;
+                    break;
+                case 'f':
+                    val = (double)argv[i]->f;
+                    break;
+                case 'd':
+                    val = (double)argv[i]->d;
+                    break;
+                case 'c'://char
+                    val = (double)argv[i]->c;
+                    break;
+                case 'T'://true
+                    val = 1.0;
+                    break;
+                case 'I'://impulse
+                    val = 1.0;
+                    break;
+                case 'F'://false
+                case 'N'://nil
+                case 'm'://midi
+                case 's'://string
+                case 'b'://blob
+                case 'S'://symbol
+                case 't'://timetag
+                default:
+                    val = 0.0;
+
+            }
+            //check if it is in bounds of constant or range
+            if(val < p->osc_val[i+p->argc_in_path] || val > p->osc_rangemax[i+p->argc_in_path])
+            {
+                return 0;
+            }
+        }
     }//for args
     return 1;
 }
@@ -1005,17 +1085,17 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         {
             return 0;
         }
-        else if(p->midi_const[0] && (msg[0]&0x0F) != p->midi_const_val[0])
+        else if(p->midi_const[0] && ((msg[0]&0x0F) < p->midi_val[0] || (msg[0]&0x0F) > p->midi_rangemax[0]))
         {
             return 0;
         }
         
-        if(p->midi_const[1] && msg[1] != p->midi_const_val[1])
+        if(p->midi_const[1] && (msg[1] < p->midi_val[1] || msg[1] > p->midi_rangemax[1]))
         {
             return 0;
         }
 
-        if(p->midi_const[2] && msg[2] != p->midi_const_val[2])
+        if(p->midi_const[2] && (msg[2] < p->midi_val[2] || msg[2] > p->midi_rangemax[2]))
         {
             return 0;
         }
@@ -1034,7 +1114,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
             }
             else
             {
-                load_osc_value( oscm,p->types[i],0.0 );//we have no idea what should be in these, so just load a 0
+                load_osc_value( oscm, p->types[i], p->osc_val[i + p->argc_in_path] );//if it's not a constant, then this is set to default 0
             }
         }
     }
@@ -1053,7 +1133,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
             }
             else
             {
-                load_osc_value( oscm,p->types[i],0.0 );//we have no idea what should be in these, so just load a 0
+                load_osc_value( oscm, p->types[i], p->osc_val[i + p->argc_in_path] );//we have no idea what should be in these, so just load a 0
             }
         }
     }
@@ -1073,7 +1153,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         }
         else
         {
-            sprintf(chunk, p->path[i], 0);
+            sprintf(chunk, p->path[i], (int)p->osc_val[i]);
         }
         strcat(path, chunk);
     }
