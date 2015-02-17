@@ -47,7 +47,6 @@ typedef struct _PAIR
 }PAIR;
 
 
-//TODO: add printing osc constants, ranges
 void print_pair(PAIRHANDLE ph)
 {
     int i;
@@ -69,9 +68,9 @@ void print_pair(PAIRHANDLE ph)
     for(i=0;i<p->argc_in_path+p->argc;i++)
     {
         if(p->osc_const[i] == 2)
-            printf("%f-%f, ",p->osc_val[i],p->osc_rangemax[i]);
+            printf("%.2f-%.2f, ",p->osc_val[i],p->osc_rangemax[i]);
         else if(p->osc_const[i] == 1)
-            printf("%f, ",p->osc_val[i]);
+            printf("%.2f, ",p->osc_val[i]);
         else
             printf("%c, ",'a'+i);
     }
@@ -97,7 +96,13 @@ void print_pair(PAIRHANDLE ph)
         printf(" %i",p->midi_val[0]);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=0;i++);
     if(i<p->argc+p->argc_in_path)
-        printf("%.2f*%c + %.2f",p->scale[0],'a'+i,p->offset[0]);
+    {
+        if(p->scale[0] != 1)
+            printf("%.2f*",p->scale[0]);
+        printf("%c",'a'+i);
+        if(p->offset[0])
+            printf(" + %.2f",p->offset[0]);
+    }
     
     //midi arg1 
     if(p->midi_const[1] == 2)
@@ -106,7 +111,14 @@ void print_pair(PAIRHANDLE ph)
         printf(", %i",p->midi_val[1]);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=1;i++);
     if(i<p->argc+p->argc_in_path)
-        printf(", %.2f*%c + %.2f",p->scale[1],'a'+i,p->offset[1]);
+    {
+        printf(", ");
+        if(p->scale[1] != 1)
+            printf("%.2f*",p->scale[1]);
+        printf("%c",'a'+i);
+        if(p->offset[1])
+            printf(" + %.2f",p->offset[1]);
+    }
     
     //global velocity
     if(p->use_glob_vel)
@@ -118,12 +130,26 @@ void print_pair(PAIRHANDLE ph)
         printf(", %i",p->midi_val[2]);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=2;i++);
     if(i<p->argc+p->argc_in_path)
-        printf(", %.2f*%c + %.2f",p->scale[2],'a'+i,p->offset[2]);
+    {
+        printf(", ");
+        if(p->scale[2] != 1)
+            printf("%.2f*",p->scale[2]);
+        printf("%c",'a'+i);
+        if(p->offset[2])
+            printf(" + %.2f",p->offset[2]);
+    }
 
     //midi arg3 (only for note on/off)
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=3;i++);
     if(i<p->argc+p->argc_in_path)
-        printf(", %.2f*%c + %.2f",p->scale[3],'a'+i,p->offset[3]);
+    {
+        printf(", ");
+        if(p->scale[3] != 1)
+            printf("%.2f*",p->scale[3]);
+        printf("%c",'a'+i);
+        if(p->offset[3])
+            printf(" + %.2f",p->offset[3]);
+    }
 
     printf(" )\n");
 }
@@ -385,24 +411,27 @@ int get_pair_midicommand(char* config, PAIR* p)
 //accordingly. val will be the min for the range
 int get_pair_arg_constant(char* arg, float* val, float* rangemax)
 {
+    uint8_t n;
     //must be a constant or range
-    if(!sscanf(arg,"%f%*[- ]%f",val,rangemax))
+    n = sscanf(arg,"%f%*[- ]%f",val,rangemax);
+    if(n==2)
     {
         //range
         return 2;
     }
-    else
+    else if(n==1)
     {
         //constant
-        if(!sscanf(arg,"%f",val))
-        {
-            *val = 0;
-            *rangemax = 0;
-            return 0;
-        }
         *rangemax = *val;
         return 1;
-    } 
+    }
+    else
+    {
+        //neither
+        *val = 0;
+        *rangemax = 0;
+        return 0;
+    }
 }
 
 //these are used to find the actual mapping
@@ -410,9 +439,9 @@ int get_pair_arg_varname(char* arg, char* varname)
 {
     //just get the name and return if successful
     int j;
-    if( !(j = sscanf(arg,"%*[.1234567890*/+- ]%[^*/+- ]%*[.1234567890*/+- ]",varname)) )
+    if( !(j = sscanf(arg,"%*[.1234567890*/+- ]%[^*/+- ,]%*[.1234567890*/+- ]",varname)) )
     {
-        j = sscanf(arg,"%[^*/+- ]%*[.1234567890*/+- ]",varname);
+        j = sscanf(arg,"%[^*/+- ,]%*[.1234567890*/+- ]",varname);
     }
     return j;
 }
@@ -427,17 +456,22 @@ int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc)
     {
         if(get_pair_arg_varname(tmp, name))
         {
-            if(!strncmp(varname,name,k) && sscanf(tmp+k,"%[ +-*/,]",name))//check if names match and it is the same length
+            if(!strncmp(varname,name,k) && k == strlen(name))
             {
                 //it's a match
                 return i;
             }
-        }
+            else
+            {
+                //next arg name
+                tmp = strchr(tmp,',');
+                tmp++;//go to char after ','
+            }
+        } 
         else
         {
-            //next arg name
-            tmp = strchr(tmp,',');
-            tmp++;//go to char after ','
+            //could not understand conditioning
+            return -1;
         }
     }
     if(i == argc)
@@ -685,17 +719,12 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             //scale and offset are inverted in osc
             p->scale[i] /= scale;
             p->offset[i] -= offset/scale;
+            //TODO: this only will allow osc to many midi variable mappings, not visa versa. 
         }
         else
         {
             //it's not used, check if it is constant or range
-            if(get_pair_arg_constant(marg[i],&f,&f2))
-            {
-                p->osc_const[i] = 1;
-                p->osc_val[i] = f;
-                p->osc_rangemax[i] = f2;
-            }
-            //else it's just some unused variable
+            p->osc_const[i] = get_pair_arg_constant(tmp,&p->osc_val[i],&p->osc_rangemax[i]);
         }
         //next arg name
         tmp = strchr(tmp,',');
