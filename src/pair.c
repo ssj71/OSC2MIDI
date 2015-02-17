@@ -66,14 +66,14 @@ void print_pair(PAIRHANDLE ph)
     printf(" %s, ",p->types);
     
     //arg names
-    for(i=0;i<p->argc_in_path;i++)
+    for(i=0;i<p->argc_in_path+p->argc;i++)
     {
-        //TODO: check here for osc constants/ranges
-        printf("%c, ",'a'+i);
-    }
-    for(;i<p->argc+p->argc_in_path;i++)
-    {
-        printf("%c, ",'a'+i);
+        if(p->osc_const[i] == 2)
+            printf("%f-%f, ",p->osc_val[i],p->osc_rangemax[i]);
+        else if(p->osc_const[i] == 1)
+            printf("%f, ",p->osc_val[i]);
+        else
+            printf("%c, ",'a'+i);
     }
     
     //command
@@ -89,26 +89,33 @@ void print_pair(PAIRHANDLE ph)
 
     //global channel
     if(p->use_glob_chan)
-        printf(" channel");
-
+        printf(" channel"); 
     //midi arg 0 
-    //TODO: if const check if range too
-    if(p->midi_const[0])printf(" %i",p->midi_val[0]);
+    if(p->midi_const[0] == 2)
+        printf(" %i-%i",p->midi_val[0], p->midi_rangemax[0]);
+    else if(p->midi_const[0] == 1)
+        printf(" %i",p->midi_val[0]);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=0;i++);
     if(i<p->argc+p->argc_in_path)
         printf("%.2f*%c + %.2f",p->scale[0],'a'+i,p->offset[0]);
     
-    
     //midi arg1 
-    if(p->midi_const[1])printf(", %i",p->midi_val[1]);
+    if(p->midi_const[1] == 2)
+        printf(", %i-%i",p->midi_val[1], p->midi_rangemax[1]);
+    else if(p->midi_const[1] == 1)
+        printf(", %i",p->midi_val[1]);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=1;i++);
     if(i<p->argc+p->argc_in_path)
         printf(", %.2f*%c + %.2f",p->scale[1],'a'+i,p->offset[1]);
     
-    //midi arg2
+    //global velocity
     if(p->use_glob_vel)
         printf(", velocity");
-    if(p->midi_const[2])printf(", %i",p->midi_val[2]);
+    //midi arg2 
+    if(p->midi_const[2] == 2)
+        printf(", %i-%i",p->midi_val[2], p->midi_rangemax[2]);
+    else if(p->midi_const[2] == 1)
+        printf(", %i",p->midi_val[2]);
     for(i=0;i<p->argc+p->argc_in_path && p->map[i]!=2;i++);
     if(i<p->argc+p->argc_in_path)
         printf(", %.2f*%c + %.2f",p->scale[2],'a'+i,p->offset[2]);

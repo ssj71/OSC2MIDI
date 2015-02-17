@@ -329,7 +329,7 @@ int main(int argc, char** argv)
     if(!conv.mon_mode)
     {
         if(conv.verbose)
-            printf(" closing jack\n");
+            printf(" closing jack ports\n");
         close_jack(&seq);
     }
     if(conv.convert > -1)
