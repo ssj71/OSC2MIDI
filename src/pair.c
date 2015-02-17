@@ -677,7 +677,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             } 
             //scale and offset are inverted in osc
             p->scale[i] /= scale;
-            p->offset[i] -= offset;
+            p->offset[i] -= offset/scale;
         }
         else
         {
