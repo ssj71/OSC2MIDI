@@ -415,6 +415,8 @@ int get_pair_arg_varname(char* arg, char* varname)
     if( !(j = sscanf(arg,"%*[.1234567890*/+- ]%[^*/+- ,]%*[.1234567890*/+- ]",varname)) )
     {
         j = sscanf(arg,"%[^*/+- ,]%*[.1234567890*/+- ]",varname);
+        if(varname[0] >= '0' && varname[0] <= '9')
+            return 0; //don't allow 1st character be a number
     }
     return j;
 }
@@ -479,8 +481,13 @@ int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc)
         } 
         else
         {
-            //could not understand conditioning
-            return -1;
+            //could not understand conditioning, check if constant
+            float f,f2;
+            if(!get_pair_arg_constant(tmp,&f,&f2))
+                return -1;
+            //next arg name
+            tmp = strchr(tmp,',');
+            tmp++;//go to char after ','
         }
     }
     if(i == argc)
