@@ -406,14 +406,35 @@ int get_pair_midicommand(char* config, PAIR* p)
     return n;
 }
 
+//this gets the alpha-numeric variable name, ignoring conditioning
+//returns 0 if no var found
+int get_pair_arg_varname(char* arg, char* varname)
+{
+    //just get the name and return if successful
+    int j=0;
+    if( !(j = sscanf(arg,"%*[.1234567890*/+- ]%[^*/+- ,]%*[.1234567890*/+- ]",varname)) )
+    {
+        j = sscanf(arg,"%[^*/+- ,]%*[.1234567890*/+- ]",varname);
+    }
+    return j;
+}
 
 //this checks if it is a constant or range and returns val and rangemax
 //accordingly. val will be the min for the range
+//returns 2 if range, 1 if const, 0 if niether
 int get_pair_arg_constant(char* arg, float* val, float* rangemax)
 {
     uint8_t n;
+    char tmp[40];
+    *val = 0;
+    *rangemax = 0;
+    if(0 < get_pair_arg_varname(arg,tmp))
+    {
+        //Not a constant, has a variable
+        return 0;
+    }
     //must be a constant or range
-    n = sscanf(arg,"%f%*[- ]%f",val,rangemax);
+    n = sscanf(arg,"%f%*[- ]%f%*[ ,]",val,rangemax);
     if(n==2)
     {
         //range
@@ -428,23 +449,11 @@ int get_pair_arg_constant(char* arg, float* val, float* rangemax)
     else
     {
         //neither
-        *val = 0;
-        *rangemax = 0;
         return 0;
     }
 }
 
 //these are used to find the actual mapping
-int get_pair_arg_varname(char* arg, char* varname)
-{
-    //just get the name and return if successful
-    int j;
-    if( !(j = sscanf(arg,"%*[.1234567890*/+- ]%[^*/+- ,]%*[.1234567890*/+- ]",varname)) )
-    {
-        j = sscanf(arg,"%[^*/+- ,]%*[.1234567890*/+- ]",varname);
-    }
-    return j;
-}
 int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc)
 {
     //find where it is in the OSC message
