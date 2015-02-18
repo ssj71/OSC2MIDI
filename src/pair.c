@@ -27,8 +27,8 @@ typedef struct _PAIR
 
     //midi constants 0- channel 1- data1 2- data2
     uint8_t opcode;
-    uint8_t midi_rangemax[3]; //range bound for midi args (or same as val)
-    uint8_t midi_val[3];  //constant values in midi args (or min of range)
+    uint8_t midi_rangemax[4]; //range bound for midi args (or same as val)
+    uint8_t midi_val[4];  //constant values in midi args (or min of range)
 
     //osc constants
     float *osc_rangemax;   //range bounds for osc args (or same as val)
@@ -41,7 +41,7 @@ typedef struct _PAIR
     uint8_t set_velocity;   //flag if message is actually control message to change global velocity
     uint8_t set_shift;      //flag if message is actually control message to change filter shift value
     uint8_t raw_midi;       //flag if message sends osc datatype of midi message
-    uint8_t midi_const[3];  //flags for midi message (channel, data1, data2) is a constant (1) or range (2)
+    uint8_t midi_const[4];  //flags for midi message (channel, data1, data2) is a constant (1) or range (2)
     uint8_t *osc_const;    //flags for osc args that are constant (1) or range (2)
 
 }PAIR;
@@ -644,10 +644,13 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     marg[3] = arg3;
     for(i=0;i<n;i++)//go through each argument
     {
+        //default values
         p->scale[i] = 1;
         p->offset[i] = 0;
+        p->midi_const[i] = 0;
+        p->midi_val[i] = p->midi_rangemax[i] = 0;
 
-        if(get_pair_arg_constant(marg[i],&f,&f2))
+        if((j = get_pair_arg_constant(marg[i],&f,&f2)))
         {
             //it's constant
             if(i == 3)
@@ -659,6 +662,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             {
                 p->midi_val[i] = (uint8_t)f;
                 p->midi_rangemax[i] = (uint8_t)f2;
+                p->midi_const[i] = j;
             }
         }
         else if(-1 == get_pair_arg_conditioning(marg[i], var, &p->scale[i], &p->offset[i]))//get conditioning for midi arg
@@ -668,19 +672,11 @@ int get_pair_mapping(char* config, PAIR* p, int n)
         } 
         else if(!strncmp(var,"channel",7))//check if its the global channel keyword
         {
-            p->use_glob_chan = 1;
-            p->scale[i] = 1; //should these global vars be able to be scaled?
-            p->offset[i] = 0;
-            p->midi_val[i] = p->midi_rangemax[i] = 0;
-            p->midi_const[i] = 0;
+            p->use_glob_chan = 1;//should these global vars be able to be scaled?
         }
         else if(!strncmp(var,"velocity",8))
         {
             p->use_glob_vel = 1;
-            p->scale[i] = 1;
-            p->offset[i] = 0;
-            p->midi_val[i] = p->midi_rangemax[i] = 0;
-            p->midi_const[i] = 0;
         }
         else
         {
@@ -689,8 +685,6 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             if(j >=0)
             {
                 p->map[j] = i;
-                p->midi_val[i] = p->midi_rangemax[i] = 0;
-                p->midi_const[i] = 0;
             }
             else
             {
@@ -707,7 +701,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
         p->osc_val[i] = 0;
         p->osc_rangemax[i] = 0;
         p->osc_const[i] = 0;
-        if(p->map[i] == -1)
+        if(p->map[i] != -1)
         {
             //it's  used, check if it is  conditioned
             float scale=1, offset=0;
@@ -730,7 +724,6 @@ int get_pair_mapping(char* config, PAIR* p, int n)
         tmp = strchr(tmp,',');
         tmp++;//go to char after ','
     }
-    
     return 0;
 }
 
