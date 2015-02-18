@@ -39,7 +39,7 @@
 /mlr/press iii, x,y,val : note( channel, x*2+54, velocity, val);
 /mlr/press iii, x,y,val : note( channel, y*4+48, velocity, val);
  # multibutton
-/multi/{i} i, indx,val : note( channel, 108-11*indx/8, 100, val);
+/multi/{i} i, indx,val : note( channel, -11*indx/8+108, 100, val);
  # sequencer
 /sliders0/{i} f, step,val : setvelocity( val );
 /sliders{i}/{i} f, cc,step,val : controlchange( channel, cc, val);

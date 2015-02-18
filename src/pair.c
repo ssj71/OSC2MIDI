@@ -592,7 +592,7 @@ int get_pair_arg_conditioning(char* arg, char* varname, float* _scale, float* _o
         
     }//if post conditioning
     *_scale *= scale;
-    *_offset *= offset;
+    *_offset += offset;
     return 0;
 }
 
