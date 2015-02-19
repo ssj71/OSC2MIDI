@@ -33,7 +33,7 @@
 /rightMulti/{i} f, indx,val : controlchange( channel, 15+indx, val);
 /rightCue i, val : controlchange( channel, 19, val);
  # conways game of life
-/life/{i} i, -note-127, val : note( channel, note,velocity, val);
+/life/{i} i, -note+127, val : note( channel, note,velocity, val);
  # monome
 /slider{i} f, indx,val : controlchange( channel, indx, val*127);
 /mlr/press iii, x,y,val : note( channel, x*2+54, velocity, val);
@@ -111,6 +111,14 @@
 # is equivalent to 
 #   /hat/sombrero if, a,b : programchange(a,b*10+5);
 # this is to allow you to think in either osc to midi conversion or visa versa.
+
+# Non-one-to-one mappings are allowed but conditioning should be the same i.e.
+#   /cow/1/moo fff, a, a, a : controlchange(channel, 10, a);
+# is allowed but
+#   /cow/1/moo fff, 2*a, a+3, a*100 : controlchange(channel, 10, a);
+# will not work correctly (osc args will all be formatted the same). Similarly midi:
+#   /bus/plugin/param2 i, val : controlchange(channel, val, val);
+# works fine.
 
 # The important formatting details for each mapping are that the path and argment
 # types are separated by a space, the first comma indicates the first argument 
