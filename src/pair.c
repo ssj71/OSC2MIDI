@@ -670,7 +670,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     char *tmp, *marg[4];
     float f,f2;
     int i,j;
-    uint8_t k;
+    int8_t k;
 
     arg0[0]=0;
     arg1[0]=0;
@@ -946,10 +946,10 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
         place = p->osc_map[i];
         if(place != -1)
         {
-            msg[place] += ((uint8_t)(p->midi_scale[place]*v + p->midi_offset[place]))&0x7F; 
+            msg[place] += ((uint8_t)(p->midi_scale[place]*(v - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]))&0x7F; 
             if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
             {
-                msg[place+1] += (uint8_t)((p->midi_scale[place]*v + p->midi_offset[place])/128.0); 
+                msg[place+1] += (uint8_t)((p->midi_scale[place]*(v - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place])/128.0); 
             }
         }
         //check if it matches range or constant
@@ -1034,33 +1034,33 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
             //check if this is a message to set global channel
             if(p->set_channel)
             {
-                msg[place+1] = (uint8_t)(p->midi_scale[place]*val + p->midi_offset[place]);
+                msg[place+1] = (uint8_t)(p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]);
                 *glob_chan = msg[place+1];
                 return -1;//not an error but don't need to send a midi message (ret 0 for error)
             }   
             else if(p->set_velocity)
             {
-                msg[place+1] = (uint8_t)(p->midi_scale[place]*val + p->midi_offset[place]);
+                msg[place+1] = (uint8_t)(p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]);
                 *glob_vel = msg[place+1];
                 return -1;
             }
             else if(p->set_shift)
             {
-                msg[place+1] = (uint8_t)(p->midi_scale[place]*val + p->midi_offset[place]);
+                msg[place+1] = (uint8_t)(p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]);
                 *filter = msg[place+1];
                 return -1;
             }
             //put it in the midi message
             if(place == 3)//only used for note on or off
             {
-                msg[0] += ((uint8_t)(p->midi_scale[place]*val + p->midi_offset[place])>0)<<4;
+                msg[0] += ((uint8_t)(p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place])>0)<<4;
             }
             else
             {
-                msg[place] += ((uint8_t)(p->midi_scale[place]*val + p->midi_offset[place]))&0x7F; 
+                msg[place] += ((uint8_t)(p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]))&0x7F; 
                 if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
                 {
-                    msg[place+1] += (uint8_t)((p->midi_scale[place]*val + p->midi_offset[place])/128.0); 
+                    msg[place+1] += (uint8_t)((p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place])/128.0); 
                 }
             }
         }//if arg is used
@@ -1170,6 +1170,7 @@ int load_osc_value(lo_message oscm, char type, float val)
     return 1;
 }
 
+//see if incoming midi message matches this pair and create the associated OSC message
 int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path, lo_message oscm)
 {
     PAIR* p = (PAIR*)ph;
@@ -1183,8 +1184,9 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         {
             if( p->opcode == 0x80 && (msg[0]&0xF0) == 0x90 )
             {//its a note on, see if pair has 3rd arg for a note() command
-                for(i=0;i<p->argc+p->argc_in_path && p->osc_map[i]!=3;i++);
-                if(i == p->argc+p->argc_in_path)
+                //for(i=0;i<p->argc+p->argc_in_path && p->osc_map[i]!=3;i++);
+                //if(i == p->argc+p->argc_in_path)
+                if(p->midi_map[3] == -1)
                 {
                     
                     return 0;
@@ -1223,11 +1225,11 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
             place = p->osc_map[i+p->argc_in_path];
             if(place == 3)
             {
-                load_osc_value( oscm,p->types[i],(noteon - p->midi_offset[place]) / p->midi_scale[place] );
+                load_osc_value( oscm,p->types[i],p->osc_scale[i+p->argc_in_path]*(noteon - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path] );
             }
             else if(place != -1)
             {
-                load_osc_value( oscm,p->types[i],((float)msg[place] - p->midi_offset[place]) / p->midi_scale[place] );
+                load_osc_value( oscm,p->types[i],p->osc_scale[i+p->argc_in_path]*((float)msg[place] - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path] );
             }
             else
             {
@@ -1238,6 +1240,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
     else
     {
         //anything matches a raw midi
+        //TODO: unless its full of constants, ranges etc...
         for(i=0;i<p->argc;i++)
         {
             if(p->types[i] == 'm' && p->osc_map[i] != -1)
@@ -1262,11 +1265,11 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         place = p->osc_map[i];
         if(place == 3)
         {
-            sprintf(chunk,p->path[i], (int)((noteon - p->midi_offset[place]) / p->midi_scale[place]));
+            sprintf(chunk,p->path[i], (int)(p->osc_scale[i]*(noteon - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i]));
         }
         else if(place != -1)
         {
-            sprintf(chunk, p->path[i], (int)((msg[place] - p->midi_offset[place]) / p->midi_scale[place]));
+            sprintf(chunk, p->path[i], (int)(p->osc_scale[i]*(msg[place] - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i]));
         }
         else
         {

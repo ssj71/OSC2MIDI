@@ -74,8 +74,7 @@
 # form min-max instead of a variable name.
 # The first arguments of the "/grid{i}" paths above are good examples. They allow
 # easier mapping of many paths to a single midi command. When converting 
-# a pair with a range the first number in the range is used each time.
-
+# a pair with a range the first number in the range is used each time.  
 
 # The next thing to note is that "channel" and velocity are keywords and shall not be used
 # as OSC argument names. The channel keyword indicates that the global channel set in
@@ -96,7 +95,7 @@
 #   /supercontroller d f h, ctl,value,grapefruit : controlchange(grapefruit,ctl,value);
 
 # There is also a non-midi command setshift(). When this appears in a map file
-# the utility creates an extra jack midi ports named filter in and out.
+# the utility creates two extra jack midi ports named filter in and out.
 # This filter shifts notes up or down the number of semitones set by this command.
 # It was implemented primarily to allow octave to be controlled through osc
 # as commonly available on keyboard midi controllers.
@@ -112,18 +111,29 @@
 #   /hat/sombrero if, a,b : programchange(a,b*10+5);
 # this is to allow you to think in either osc to midi conversion or visa versa.
 
-# Non-one-to-one mappings are allowed but conditioning should be the same i.e.
-#   /cow/1/moo fff, a, a, a : controlchange(channel, 10, a);
-# is allowed but
-#   /cow/1/moo fff, 2*a, a+3, a*100 : controlchange(channel, 10, a);
-# will not work correctly (osc args will all be formatted the same). Similarly midi:
+# You can also have conditioning on both the osc and midi side, but you might
+# get a headache reversing the one side and applying the other. Aw, heck, I'll
+# try to explain it. If an osc message comes in with a 1 and the pair is declared:
+#   /confusing/but/linear i, 2*var-1 : programchange(channel, 4*var+3)
+# then the program change will be 4*( (1-(-1))/2 ) + 3 = 7. So everything inside
+# the parenthesis is undoing the osc side conditioning then outside is applying
+# the midi side conditioning. This is only useful really if you are going to use
+# mappings that are not one-to-one.
+
+# Non-one-to-one mappings are allowed such as
+#   /cow/1/moo fff, 2*a, a+3, a*100 : controlchange(channel, 10, a); 
 #   /bus/plugin/param2 i, val : controlchange(channel, val, val);
-# works fine.
+# As you can see variables from one side are used several times on the other side.
+# If you expect messages to be converted both ways it is recommended that you use
+# strictly one to one mappings.
 
 # The important formatting details for each mapping are that the path and argment
 # types are separated by a space, the first comma indicates the first argument 
 # name (naming the variable in the path or actual OSC argument), second comma 
-# for the next argument etc. The colon separates the OSC information from the midi
+# for the next argument etc. You can have fewer variable names than acutal osc args
+# or leave a blank for unused variable names, i.e.
+#   /hello/world iififfiii, , ,floatval, : programchange( ,floatval*127);
+# The colon separates the OSC information from the midi
 # information. After the colon must appear a valid function name with the correct
 # number of arguments. Each mapping must have its own line.
 
