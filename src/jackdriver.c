@@ -225,7 +225,7 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                 if((event.buffer[0]&0xF0) == 0x80 || (event.buffer[0]&0xF0) == 0x90)
                 {
                     //note on/off event
-                    event.buffer[2] += *seq->filter;
+                    event.buffer[1] += *seq->filter;
                 }
                 
             }

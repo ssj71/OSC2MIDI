@@ -926,6 +926,7 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
     int i,v,n;
     char *tmp;
     int place;
+    float conditioned;
     for(i=0;i<p->argc_in_path;i++)
     {
         //does it match?
@@ -946,10 +947,11 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
         place = p->osc_map[i];
         if(place != -1)
         {
-            msg[place] += ((uint8_t)(p->midi_scale[place]*(v - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]))&0x7F; 
+            conditioned = p->midi_scale[place]*(v - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]; 
+            msg[place] += ((uint8_t)conditioned)&0x7F; 
             if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
             {
-                msg[place+1] += (uint8_t)((p->midi_scale[place]*(v - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place])/128.0); 
+                msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F; 
             }
         }
         //check if it matches range or constant
@@ -1031,36 +1033,37 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                     return 0;
 
             }
+            conditioned = p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]; 
             //check if this is a message to set global channel
             if(p->set_channel)
             {
-                msg[place+1] = (uint8_t)(p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]);
+                msg[place+1] = ((uint8_t)conditioned)&0x7F;
                 *glob_chan = msg[place+1];
                 return -1;//not an error but don't need to send a midi message (ret 0 for error)
             }   
             else if(p->set_velocity)
             {
-                msg[place+1] = (uint8_t)(p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]);
+                msg[place+1] = ((uint8_t)conditioned)&0x7F;
                 *glob_vel = msg[place+1];
                 return -1;
             }
             else if(p->set_shift)
             {
-                msg[place+1] = (uint8_t)(p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]);
-                *filter = msg[place+1];
+                msg[place+1] = ((uint8_t)conditioned);
+                *filter = conditioned;
                 return -1;
             }
             //put it in the midi message
             if(place == 3)//only used for note on or off
             {
-                msg[0] += ((uint8_t)(p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place])>0)<<4;
+                msg[0] += ((uint8_t)(conditioned>0))<<4;
             }
             else
             {
-                msg[place] += ((uint8_t)(p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place]))&0x7F; 
+                msg[place] += ((uint8_t)conditioned)&0x7F; 
                 if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
                 {
-                    msg[place+1] += (uint8_t)((p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place])/128.0); 
+                    msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F; 
                 }
             }
         }//if arg is used
