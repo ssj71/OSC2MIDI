@@ -179,7 +179,7 @@ process_midi_input(JACK_SEQ* seq,jack_nframes_t nframes)
 void
 process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
 {
-	int read, events, i;
+	int read, events, i, j;
     uint8_t* buffer;
 	void *inport_buffer;
 	void *outport_buffer;
@@ -195,6 +195,11 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
 		printf("jack_port_get_buffer failed, cannot send anything.");
 		return;
 	}
+    if(*seq->filter != seq->old_filter)
+    {
+        seq->old_filter = *seq->filter;
+        //turn off all currently on notes
+    }
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
 	events = jack_midi_get_event_count(inport_buffer, nframes);
@@ -222,10 +227,34 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
             if (event.size <= 3 && event.size >=1) {
                 //not sysex or something
                 
-                if((event.buffer[0]&0xF0) == 0x80 || (event.buffer[0]&0xF0) == 0x90)
+                if((event.buffer[0]&0xF0) == 0x80)
                 {
-                    //note on/off event
+                    uint8_t on = seq->notes[0];
+                    //note off event
+                    //remove it from list
+                    for(j=0;j<seq->nnotes;j++)
+                    {
+                        //
+                        if(on == event.buffer[1])
+                        {
+                            //
+                            seq->notes[j-1] = seq->notes[j];
+                        }
+                        else
+                        {
+                            on = seq->notes[j];
+                        }
+                    }
                     event.buffer[1] += *seq->filter;
+                }
+                else if((event.buffer[0]&0xF0) == 0x90)
+                {
+                    //note on event
+                    event.buffer[1] += *seq->filter;
+                    for(j=0;j<seq->nnotes;j++)
+                    {
+                        //
+                    }
                 }
                 
             }
@@ -388,6 +417,8 @@ init_jack(JACK_SEQ* seq, uint8_t verbose)
 {
 	int err;
 
+    seq->nnotes = 0;
+    seq->old_filter = 0;
     if(verbose)printf("opening client...\n");
     seq->jack_client = jack_client_open("osc2midi", JackNoStartServer, NULL);
 

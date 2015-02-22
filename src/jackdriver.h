@@ -15,6 +15,9 @@ typedef struct _jseq{
     uint8_t useout;
     uint8_t usefilter;
     int8_t* filter;
+    int8_t old_filter;
+    uint8_t note[127];
+    uint8_t nnotes;
 }JACK_SEQ;
 
 int init_jack(JACK_SEQ* seq, uint8_t verbose);
