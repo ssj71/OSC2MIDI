@@ -198,7 +198,43 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
     if(*seq->filter != seq->old_filter)
     {
         seq->old_filter = *seq->filter;
-        //turn off all currently on notes
+        //turn off all currently on notes and send new note-ons
+        for(j=0;j<seq->nnotes;j++)
+        {
+            event.buffer[0] = seq->notechan[j]-0x10;//note on to note off
+            event.buffer[1] = seq->note[j];
+            event.buffer[2] = seq->notevel[j];
+#ifdef JACK_MIDI_NEEDS_NFRAMES
+            buffer = jack_midi_event_reserve(outport_buffer, 0, 3, nframes);
+#else
+            buffer = jack_midi_event_reserve(outport_buffer, 0, 3);
+#endif
+
+            if (buffer == NULL) {
+                //warn_from_jack_thread_context("jack_midi_event_reserve failed, NOTE LOST.");
+                break;
+            }
+
+            memcpy(buffer, event.buffer, event.size);
+        }
+        for(j=0;j<seq->nnotes;j++)
+        {
+            event.buffer[0] = seq->notechan[j];//note on to note off
+            event.buffer[1] = seq->note[j]+*seq->filter;
+            event.buffer[2] = seq->notevel[j];
+#ifdef JACK_MIDI_NEEDS_NFRAMES
+            buffer = jack_midi_event_reserve(outport_buffer, 0, 3, nframes);
+#else
+            buffer = jack_midi_event_reserve(outport_buffer, 0, 3);
+#endif
+
+            if (buffer == NULL) {
+                //warn_from_jack_thread_context("jack_midi_event_reserve failed, NOTE LOST.");
+                break;
+            }
+
+            memcpy(buffer, event.buffer, event.size);
+        }
     }
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
@@ -229,32 +265,43 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                 
                 if((event.buffer[0]&0xF0) == 0x80)
                 {
-                    uint8_t on = seq->notes[0];
+                    uint8_t on = seq->note[0];
                     //note off event
                     //remove it from list
                     for(j=0;j<seq->nnotes;j++)
                     {
-                        //
+                        //find it and shift everything above it down 1
                         if(on == event.buffer[1])
                         {
-                            //
-                            seq->notes[j-1] = seq->notes[j];
+                            seq->note[j-1] = seq->note[j];
                         }
                         else
                         {
-                            on = seq->notes[j];
+                            on = seq->note[j];
                         }
+                    }
+                    if(on == event.buffer[1])
+                    {
+                        seq->nnotes--;
                     }
                     event.buffer[1] += *seq->filter;
                 }
                 else if((event.buffer[0]&0xF0) == 0x90)
                 {
                     //note on event
-                    event.buffer[1] += *seq->filter;
                     for(j=0;j<seq->nnotes;j++)
                     {
-                        //
+                        if(seq->note[j] == event.buffer[1])
+                        {
+                            break;
+                        }
                     }
+                    if(j != seq->nnotes)
+                    {
+                        //add note to queue
+                        seq->note[seq->nnotes++] = event.buffer[1];
+                    }
+                    event.buffer[1] += *seq->filter;
                 }
                 
             }

@@ -16,7 +16,10 @@ typedef struct _jseq{
     uint8_t usefilter;
     int8_t* filter;
     int8_t old_filter;
+    //keep track off on notes to jump octaves mid note
+    uint8_t notechan[127];
     uint8_t note[127];
+    uint8_t notevel[127];
     uint8_t nnotes;
 }JACK_SEQ;
 
