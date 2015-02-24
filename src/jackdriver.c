@@ -181,6 +181,7 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
 {
 	int read, events, i, j;
     uint8_t* buffer;
+    int8_t filter = *seq->filter;
 	void *inport_buffer;
 	void *outport_buffer;
 	jack_midi_event_t event;
@@ -195,15 +196,25 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
 		printf("jack_port_get_buffer failed, cannot send anything.");
 		return;
 	}
-    if(*seq->filter != seq->old_filter)
+
+#ifdef JACK_MIDI_NEEDS_NFRAMES
+	jack_midi_clear_buffer(outport_buffer, nframes);
+#else
+	jack_midi_clear_buffer(outport_buffer);
+#endif
+
+    //check if filter shift amount has changed
+    if(filter != seq->old_filter)
     {
-        seq->old_filter = *seq->filter;
+        uint8_t data[3];
+        event.buffer = data;
+        event.size = 3;
         //turn off all currently on notes and send new note-ons
         for(j=0;j<seq->nnotes;j++)
         {
-            event.buffer[0] = seq->notechan[j]-0x10;//note on to note off
-            event.buffer[1] = seq->note[j];
-            event.buffer[2] = seq->notevel[j];
+            event.buffer[0] = seq->notechan[j]&0xEF;//note on to note off
+            event.buffer[1] = seq->note[j]+seq->old_filter;
+            event.buffer[2] = 0;
 #ifdef JACK_MIDI_NEEDS_NFRAMES
             buffer = jack_midi_event_reserve(outport_buffer, 0, 3, nframes);
 #else
@@ -215,12 +226,12 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                 break;
             }
 
-            memcpy(buffer, event.buffer, event.size);
+            memcpy(buffer, event.buffer, 3);
         }
         for(j=0;j<seq->nnotes;j++)
         {
-            event.buffer[0] = seq->notechan[j];//note on to note off
-            event.buffer[1] = seq->note[j]+*seq->filter;
+            event.buffer[0] = seq->notechan[j];//note on
+            event.buffer[1] = seq->note[j]+filter;
             event.buffer[2] = seq->notevel[j];
 #ifdef JACK_MIDI_NEEDS_NFRAMES
             buffer = jack_midi_event_reserve(outport_buffer, 0, 3, nframes);
@@ -233,8 +244,9 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                 break;
             }
 
-            memcpy(buffer, event.buffer, event.size);
+            memcpy(buffer, event.buffer, 3);
         }
+        seq->old_filter = filter;
     }
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
@@ -243,11 +255,6 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
 	events = jack_midi_get_event_count(inport_buffer);
 #endif
 
-#ifdef JACK_MIDI_NEEDS_NFRAMES
-	jack_midi_clear_buffer(outport_buffer, nframes);
-#else
-	jack_midi_clear_buffer(outport_buffer);
-#endif
 
 	for (i = 0; i < events; i++) {
 
@@ -271,11 +278,13 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                     for(j=0;j<seq->nnotes;j++)
                     {
                         //find it and shift everything above it down 1
-                        if(on == event.buffer[1])
+                        if(j && on == event.buffer[1])
                         {
                             seq->note[j-1] = seq->note[j];
+                            seq->notechan[j-1] = seq->notechan[j];
+                            seq->notevel[j-1] = seq->notevel[j];
                         }
-                        else
+                        else if(j)
                         {
                             on = seq->note[j];
                         }
@@ -284,24 +293,27 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                     {
                         seq->nnotes--;
                     }
-                    event.buffer[1] += *seq->filter;
+                    event.buffer[1] += filter;
                 }
                 else if((event.buffer[0]&0xF0) == 0x90)
                 {
                     //note on event
                     for(j=0;j<seq->nnotes;j++)
                     {
+                        //check if it's already on the list
                         if(seq->note[j] == event.buffer[1])
                         {
                             break;
                         }
                     }
-                    if(j != seq->nnotes)
+                    if(j == seq->nnotes)
                     {
                         //add note to queue
-                        seq->note[seq->nnotes++] = event.buffer[1];
+                        seq->notechan[seq->nnotes] = event.buffer[0];
+                        seq->note[seq->nnotes] = event.buffer[1];
+                        seq->notevel[seq->nnotes++] = event.buffer[2];
                     }
-                    event.buffer[1] += *seq->filter;
+                    event.buffer[1] += filter;
                 }
                 
             }
