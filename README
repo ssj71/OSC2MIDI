@@ -1,6 +1,6 @@
-OSC2MIDI is a highly configurable OSC to jack MIDI bridge for linux. It was designed especially
-for use of the open source Android app called "Control (OSC+MIDI)" but was deliberately written
-to be flexible enough to be used with any OSC controller or target.
+OSC2MIDI is a highly configurable OSC to jack MIDI (and back) bridge for linux. It was designed 
+especially for use of the open source Android app called "Control (OSC+MIDI)" but was 
+deliberately written to be flexible enough to be used with any OSC controller or target.
 
 To try it out download the source files, extract them, and open the resulting directory.
 
@@ -39,8 +39,9 @@ map file or tweak the existing ones there is extensive documentation in
 If you want to try a different mapping just run with the -m argument. i.e. 
   osc2midi -m gameOfLife
 
-This will run with the mapping dictated by gameOfLife.omm in the .osc2midi directory. Files
-will be relative this directory. You may also pass an absolute path with this argument.
+This will run with the mapping dictated by gameOfLife.omm in the .osc2midi directory. The
+app will check the ~/.osc2midi directory if it cannot find the specified file as a relative
+or absloute path.
 
 For creating your own mappings it might be useful to use monitor mode (-mon) which only
 prints out the OSC messages that are recieved. While testing a new mapping it is often
