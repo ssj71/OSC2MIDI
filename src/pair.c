@@ -209,7 +209,7 @@ void rm_whitespace(char* str)
 {
     int i,j;
     int n = strlen(str);
-    for(i=j=0;j<n;i++)//remove whitespace
+    for(i=j=0;j<=n;i++)//remove whitespace (and move null terminator)
     {
         while(str[j] == ' ' || str[j] == '\t')
         {
@@ -454,7 +454,7 @@ int get_pair_arg_varname(char* arg, char* varname)
 {
     //just get the name and return if successful
     int j=0;
-    if( !(j = sscanf(arg,"%*[.1234567890*/+- ]%[^*/+- ,]%*[.1234567890*/+- ]",varname)) )
+    if( !(j = sscanf(arg,"%*[.1234567890*/+- ]%[^*/+- ,:]%*[.1234567890*/+- ]",varname)) )
     {
         j = sscanf(arg,"%[^*/+- ,]%*[.1234567890*/+- ]",varname);
         if(varname[0] >= '0' && varname[0] <= '9')
