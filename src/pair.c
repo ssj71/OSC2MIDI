@@ -1177,7 +1177,8 @@ int load_osc_value(lo_message oscm, char type, float val)
 int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path, lo_message oscm)
 {
     PAIR* p = (PAIR*)ph;
-    uint8_t i,place,m[4] = {0,0,0,0}, noteon = 0;
+    uint8_t i,m[4] = {0,0,0,0}, noteon = 0;
+    int8_t place;
     char chunk[100];
 
     if(!p->raw_midi)
