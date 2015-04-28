@@ -33,15 +33,14 @@ int is_empty(const char *s)
     return 1;
 }
 
-int load_map(CONVERTER* conv, char* path, char* file)
+int load_map(CONVERTER* conv, char* file)
 {
     int i;
-    char file2[200],line[400];
+    char path[200],file2[200],line[400],*home;
     FILE* map;
     PAIRHANDLE *p;
 
     //try to load the file:
-    //if(file[0] == '/')
     {
         //absolute path
         map = fopen(file,"r");
@@ -55,6 +54,19 @@ int load_map(CONVERTER* conv, char* path, char* file)
     }
     if(!map)
     {
+        //check at home
+        home = getenv("XDG_CONFIG_HOME");
+        if(!home)
+        {
+            home = getenv("HOME");
+            strcpy(path,home);
+            strcat(path,"/.config");
+        }
+        else
+        {
+            strcpy(path,home); 
+        }
+        strcat(path,"/osc2midi/");
         map = fopen(strcat(path,file),"r");
         if(!map)
         {
@@ -62,6 +74,27 @@ int load_map(CONVERTER* conv, char* path, char* file)
         }
         if(!map)
         {
+            //try etc location
+            strcpy(path,"/etc/osc2midi/");
+            map = fopen(strcat(path,file),"r");
+        }
+        if(!map)
+        {
+            map = fopen(strcat(path,".omm"),"r");
+        }
+        if(!map)
+        {
+            //try default install location
+            strcpy(path,"/usr/share/osc2midi/");
+            map = fopen(strcat(path,file),"r");
+        }
+        if(!map)
+        {
+            map = fopen(strcat(path,".omm"),"r");
+        }
+        if(!map)
+        {
+            path[strlen(path)-4]=0;
             printf("Error opening map file! %s",path);
             fflush(stdout);
             printf("\b\b\b\n");
@@ -146,7 +179,7 @@ void useage()
 
 int main(int argc, char** argv)
 {
-    char path[200],file[200], port[200], addr[200], aport[50];
+    char file[200], port[200], addr[200], aport[50];
     int i;
     lo_address loaddr;
     CONVERTER conv;
@@ -154,8 +187,6 @@ int main(int argc, char** argv)
 
     //defaults
     strcpy(file,"default.omm");
-    strcpy(path,getenv("HOME"));
-    strcat(path,"/.osc2midi/");
     strcpy(port,"57120");
     strcpy(addr,"");
     strcpy(aport,"8000");
@@ -248,11 +279,13 @@ int main(int argc, char** argv)
         {
             //help
             useage();
+            return -1;
         }
         else
         {
             printf("Unknown argument! %s\n",argv[i]);
             useage();
+            return -1; 
         }
 
     }
@@ -261,7 +294,7 @@ int main(int argc, char** argv)
 
     if(!conv.mon_mode)
     {
-        if(load_map(&conv,path,file) == -1)
+        if(load_map(&conv,file) == -1)
             return -1;
         if( (i = check_pair_set_for_filter(conv.p,conv.npairs)) )
         {

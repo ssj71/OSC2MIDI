@@ -24,8 +24,8 @@ For additional details on what options are available run
 
 OSC2MIDI allows you to change the mapping between OSC and MIDI messages using an OSC to MIDI map
 file (.omm). This package has several mappings already installed to your home directory in the
-folder .osc2midi/. The default mapping is made to work with all the default interfaces that 
-come with the Control Android app. Other mappings are:
+folder /usr/share/osc2midi/. The default mapping is made to work with all the default interfaces
+that come with the Control Android app. Other included mappings are:
  touchosc - this was made to work with the proprietary Android app of the same name, but I don't own it so it is untested
  androsc - this file works with the default widgets in the open source android app andrOSC
  generic - this was made to work with generic OSC clients that send MIDI like messages
@@ -34,14 +34,19 @@ come with the Control Android app. Other mappings are:
 
 Mappings are in plain text and are completely human readable. If you wish to make your own
 map file or tweak the existing ones there is extensive documentation in 
-~/.osc2midi/default.omm
+/usr/share/osc2midi/default.omm
+
+You can make your own mappings and store them in $XDG_CONFIG_HOME/osc2midi/ which is
+usually located at ~/.config/osc2midi/ mappings in this directory will be used first, 
+followed by maps in /etc/osc2midi/ and finally in the default install location
+of /usr/share/osc2midi
 
 If you want to try a different mapping just run with the -m argument. i.e. 
   osc2midi -m gameOfLife
 
 This will run with the mapping dictated by gameOfLife.omm in the .osc2midi directory. The
-app will check the ~/.osc2midi directory if it cannot find the specified file as a relative
-or absloute path.
+app will check the directories as outlined above if it cannot find the specified file
+as a relative or absloute path.
 
 For creating your own mappings it might be useful to use monitor mode (-mon) which only
 prints out the OSC messages that are recieved. While testing a new mapping it is often
