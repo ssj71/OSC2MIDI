@@ -5,6 +5,6 @@ add_subdirectory(src/)
 
 # file(MAKE_DIRECTORY /usr/share/osc2midi)
 install (DIRECTORY maps/
-  DESTINATION /usr/share/osc2midi
+  DESTINATION share/osc2midi
   USE_SOURCE_PERMISSIONS
 )

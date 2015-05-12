@@ -68,41 +68,55 @@ int load_map(CONVERTER* conv, char* file)
         }
         strcat(path,"/osc2midi/");
         map = fopen(strcat(path,file),"r");
-        if(!map)
-        {
-            map = fopen(strcat(path,".omm"),"r");
-        }
-        if(!map)
-        {
-            //try etc location
-            strcpy(path,"/etc/osc2midi/");
-            map = fopen(strcat(path,file),"r");
-        }
-        if(!map)
-        {
-            map = fopen(strcat(path,".omm"),"r");
-        }
-        if(!map)
-        {
-            //try default install location
-            strcpy(path,"/usr/share/osc2midi/");
-            map = fopen(strcat(path,file),"r");
-        }
-        if(!map)
-        {
-            map = fopen(strcat(path,".omm"),"r");
-        }
-        if(!map)
-        {
-            path[strlen(path)-4]=0;
-            printf("Error opening map file! %s",path);
-            fflush(stdout);
-            printf("\b\b\b\n");
-            return -1;
-        }
-        if(conv->verbose)
-            printf("Using map file %s\n",path);
     }
+    if(!map)
+    {
+        //try with extra .omm
+        map = fopen(strcat(path,".omm"),"r");
+    }
+    if(!map)
+    {
+        //try etc location
+        strcpy(path,"/etc/osc2midi/");
+        map = fopen(strcat(path,file),"r");
+    }
+    if(!map)
+    {
+        //try with extra .omm
+        map = fopen(strcat(path,".omm"),"r");
+    }
+    if(!map)
+    {
+        //try default install location
+        strcpy(path,"/usr/local/share/osc2midi/");
+        map = fopen(strcat(path,file),"r");
+    }
+    if(!map)
+    {
+        //try with extra .omm
+        map = fopen(strcat(path,".omm"),"r");
+    }
+    if(!map)
+    {
+        //try default packaged install location
+        strcpy(path,"/usr/local/share/osc2midi/");
+        map = fopen(strcat(path,file),"r");
+    }
+    if(!map)
+    {
+        //try with extra .omm
+        map = fopen(strcat(path,".omm"),"r");
+    }
+    if(!map)
+    {
+        path[strlen(path)-4]=0;
+        printf("Error opening map file! %s",path);
+        fflush(stdout);
+        printf("\b\b\b\n");
+        return -1;
+    }
+    if(conv->verbose)
+        printf("Using map file %s\n",path);
 
     //count how many lines there are
     i=0;

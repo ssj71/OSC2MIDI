@@ -28,6 +28,6 @@ target_link_libraries(osc2midi ${LO_LIBRARIES} ${JACK_LIBRARIES} m)
 
 # config install
 install(TARGETS osc2midi
-  DESTINATION /usr/local/bin
+  DESTINATION bin
 )
 
