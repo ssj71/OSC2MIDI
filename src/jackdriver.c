@@ -46,7 +46,7 @@ typedef struct _MidiMessage {
 	uint8_t	data[3];
 } MidiMessage;
 
-#define RINGBUFFER_SIZE		1024*sizeof(MidiMessage)
+#define RINGBUFFER_SIZE		256*sizeof(MidiMessage)
 
 /* Will emit a warning if time between jack callbacks is longer than this. */
 #define MAX_TIME_BETWEEN_CALLBACKS	0.1
@@ -339,7 +339,7 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
 void
 process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 {
-	int read, t, bytes_remaining;
+	int read, t;
 	uint8_t *buffer;
 	void *port_buffer;
 	jack_nframes_t last_frame_time;
@@ -359,9 +359,6 @@ process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 	jack_midi_clear_buffer(port_buffer);
 #endif
 
-	/* We may push at most one byte per 0.32ms to stay below 31.25 Kbaud limit. */
-	//bytes_remaining = nframes_to_ms(seq->jack_client,nframes) * rate_limit;
-
 	while (jack_ringbuffer_read_space(seq->ringbuffer_out)) {
 		read = jack_ringbuffer_peek(seq->ringbuffer_out, (char *)&ev, sizeof(ev));
 
@@ -370,8 +367,6 @@ process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 			jack_ringbuffer_read_advance(seq->ringbuffer_out, read);
 			continue;
 		}
-
-		bytes_remaining -= ev.len;
 
 		t = ev.time + nframes - last_frame_time;
 
@@ -479,7 +474,7 @@ init_jack(JACK_SEQ* seq, uint8_t verbose)
     seq->nnotes = 0;
     seq->old_filter = 0;
     if(verbose)printf("opening client...\n");
-    seq->jack_client = jack_client_open("osc2midi", JackNoStartServer, NULL);
+    seq->jack_client = jack_client_open("osc2midi", JackNullOption, NULL);
 
 	if (seq->jack_client == NULL) {
         printf("Could not connect to the JACK server; run jackd first?\n");
