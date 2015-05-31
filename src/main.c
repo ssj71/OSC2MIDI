@@ -36,21 +36,16 @@ int is_empty(const char *s)
 int load_map(CONVERTER* conv, char* file)
 {
     int i;
-    char path[200],file2[200],line[400],*home;
+    char path[200],line[400],*home;
     FILE* map;
     PAIRHANDLE *p;
 
     //try to load the file:
+    //absolute path
+    map = fopen(strcpy(path,file),"r");
+    if(!map)
     {
-        //absolute path
-        map = fopen(file,"r");
-        if(!map)
-        {
-            strcpy(file2,file);
-            map = fopen(strcat(file2,".omm"),"r");
-        }
-        if(map && conv->verbose)
-            printf("Using map file %s\n",file);
+      map = fopen(strcat(path,".omm"),"r");
     }
     if(!map)
     {
