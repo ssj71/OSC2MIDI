@@ -22,11 +22,14 @@ void quitter(int sig)
     quit = 1;
 }
 
-int is_empty(const char *s) 
+int is_empty(const char *s)
+// check whether a config line is empty or just a comment
 {
     while (*s != '\0') 
     {
-        if (!isspace(*s))
+        if (*s == '#')
+	    return 1;
+        else if (!isspace(*s))
             return 0;
         s++;
     }
@@ -118,8 +121,8 @@ int load_map(CONVERTER* conv, char* file)
     while(!feof(map))
     {
         if (!fgets(line,400,map)) break;
-        if(!sscanf(line,"%[ \t#]",file))
-            i++;//line is not commented out
+        if(!is_empty(line))
+            i++;//line is not commented out and not empty
     }
 
     p = (PAIRHANDLE*)malloc(sizeof(PAIRHANDLE)*i);
@@ -128,7 +131,7 @@ int load_map(CONVERTER* conv, char* file)
     while(!feof(map))
     {
         if (!fgets(line,400,map)) break;
-        if(!sscanf(line,"%[ \t#]",file) && !is_empty(line))
+        if(!is_empty(line))
         {
             p[i] = alloc_pair(line);
             if(p[i++])
