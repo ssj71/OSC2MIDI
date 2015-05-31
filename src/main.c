@@ -117,7 +117,7 @@ int load_map(CONVERTER* conv, char* file)
     i=0;
     while(!feof(map))
     {
-        fgets(line,400,map);
+        if (!fgets(line,400,map)) break;
         if(!sscanf(line,"%[ \t#]",file))
             i++;//line is not commented out
     }
@@ -127,7 +127,7 @@ int load_map(CONVERTER* conv, char* file)
     i=0;
     while(!feof(map))
     {
-        fgets(line,400,map);
+        if (!fgets(line,400,map)) break;
         if(!sscanf(line,"%[ \t#]",file) && !is_empty(line))
         {
             p[i] = alloc_pair(line);
