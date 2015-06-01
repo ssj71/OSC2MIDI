@@ -530,12 +530,12 @@ int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc, uint8_t s
         }
         //next arg name
         tmp = strchr(tmp,',');
-        if(!tmp)
+        tmp++;//go to char after ','
+        if(tmp[0] == 0)
         {
             //underspecified (no more variable names)
             return -1;
         }
-        tmp++;//go to char after ','
     }
     if(i == argc)
     {
