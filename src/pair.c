@@ -1233,7 +1233,12 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
             }
             else if(place != -1)
             {
-                load_osc_value( oscm,p->types[i],p->osc_scale[i+p->argc_in_path]*((float)msg[place] - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path] );
+	        int midival = msg[place];
+		if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+		{
+		    midival += msg[place+1]*128;
+		}
+                load_osc_value( oscm,p->types[i],p->osc_scale[i+p->argc_in_path]*((float)midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path] );
             }
             else
             {
