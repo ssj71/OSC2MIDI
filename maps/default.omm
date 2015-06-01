@@ -130,7 +130,10 @@
 # The important formatting details for each mapping are that the path and argment
 # types are separated by a space, the first comma indicates the first argument 
 # name (naming the variable in the path or actual OSC argument), second comma 
-# for the next argument etc. You can have fewer variable names than acutal osc args
+# for the next argument etc. Even when there are no arguments, the comma is 
+# required to separate the empty type and argname fields. For example:
+#   /pathonly , : programchange(1,23);
+# You can have fewer variable names than acutal osc args
 # or leave a blank for unused variable names, i.e.
 #   /hello/world iififfiii, , ,floatval, : programchange( ,floatval*127);
 # The colon separates the OSC information from the midi
