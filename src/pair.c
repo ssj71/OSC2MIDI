@@ -505,23 +505,28 @@ int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc, uint8_t s
     char name[50] = "";
     int k = strlen(varname);
     char* tmp = oscargs;
+
     for(i=0;i<argc;i++)
     {
-        if(get_pair_arg_varname(tmp, name))
+        if(tmp[0] != ',')
         {
-            if(!strncmp(varname,name,k) && k == strlen(name))
+            //argument is not blank
+            if(get_pair_arg_varname(tmp, name))
             {
-                //it's a match
-                if(!skip--)
-                    return i;
+                if(!strncmp(varname,name,k) && k == strlen(name))
+                {
+                    //it's a match
+                    if(!skip--)
+                        return i;
+                }
+            } 
+            else
+            {
+                //could not understand conditioning, check if constant
+                float f,f2;
+                if(!get_pair_arg_constant(tmp,&f,&f2))
+                    return -1;
             }
-        } 
-        else
-        {
-            //could not understand conditioning, check if constant
-            float f,f2;
-            if(!get_pair_arg_constant(tmp,&f,&f2))
-                return -1;
         }
         //next arg name
         tmp = strchr(tmp,',');
