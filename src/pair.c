@@ -1186,21 +1186,31 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
     int8_t place;
     char chunk[100];
 
+    // We may have to mutate the MIDI message below, so we actually work on
+    // this copy in order to keep the original message unscathed. -ag
+    uint8_t mymsg[3] = {msg[0],msg[1],msg[2]};
+
     if(!p->raw_midi)
     {
         //check the opcode
-        if( (msg[0]&0xF0) != p->opcode )
+        if( (mymsg[0]&0xF0) != p->opcode )
         {
-            if( p->opcode == 0x80 && (msg[0]&0xF0) == 0x90 )
+            if( p->opcode == 0x80 && (mymsg[0]&0xF0) == 0x90 )
             {//its a note on, see if pair has 3rd arg for a note() command
                 //for(i=0;i<p->argc+p->argc_in_path && p->osc_map[i]!=3;i++);
                 //if(i == p->argc+p->argc_in_path)
                 if(p->midi_map[3] == -1)
                 {
-                    
                     return 0;
                 }
                 noteon = 1;
+            }
+            else if( p->opcode == 0x90 && (mymsg[0]&0xF0) == 0x80 )
+            {//it's a note off, and while we expected to see a note on, a note
+	     //off can always be interpreted as a note on with a velocity of
+	     //0, so let's just pretend we got that instead - ag
+                mymsg[0] += 0x10;
+		mymsg[2] = 0;
             }
             else
             {
@@ -1209,21 +1219,21 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         }
 
         //check the channel
-        if(p->use_glob_chan && (msg[0]&0x0F) != *glob_chan)
+        if(p->use_glob_chan && (mymsg[0]&0x0F) != *glob_chan)
         {
             return 0;
         }
-        else if(p->midi_const[0] && ((msg[0]&0x0F) < p->midi_val[0] || (msg[0]&0x0F) > p->midi_rangemax[0]))
+        else if(p->midi_const[0] && ((mymsg[0]&0x0F) < p->midi_val[0] || (mymsg[0]&0x0F) > p->midi_rangemax[0]))
         {
             return 0;
         }
         
-        if(p->midi_const[1] && (msg[1] < p->midi_val[1] || msg[1] > p->midi_rangemax[1]))
+        if(p->midi_const[1] && (mymsg[1] < p->midi_val[1] || mymsg[1] > p->midi_rangemax[1]))
         {
             return 0;
         }
 
-        if(p->midi_const[2] && (msg[2] < p->midi_val[2] || msg[2] > p->midi_rangemax[2]))
+        if(p->midi_const[2] && (mymsg[2] < p->midi_val[2] || mymsg[2] > p->midi_rangemax[2]))
         {
             return 0;
         }
@@ -1238,10 +1248,10 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
             }
             else if(place != -1)
             {
-	        int midival = msg[place];
+	        int midival = mymsg[place];
 		if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
 		{
-		    midival += msg[place+1]*128;
+		    midival += mymsg[place+1]*128;
 		}
                 load_osc_value( oscm,p->types[i],p->osc_scale[i+p->argc_in_path]*((float)midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path] );
             }
@@ -1258,16 +1268,16 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         //the MIDI message match up; is that good enough? -ag
         for(i=0;i<3;i++) {
 	    if(p->midi_map[i] == -1 &&
-	       (msg[i] < p->midi_val[i] || msg[i] > p->midi_rangemax[i]))
+	       (mymsg[i] < p->midi_val[i] || mymsg[i] > p->midi_rangemax[i]))
 	        return 0;
 	}
         for(i=0;i<p->argc;i++)
         {
             if(p->types[i] == 'm' && p->osc_map[i] != -1)
             {
-                m[1] = msg[0];
-                m[2] = msg[1];
-                m[3] = msg[2];
+                m[1] = mymsg[0];
+                m[2] = mymsg[1];
+                m[3] = mymsg[2];
                 m[0] = 0;//port ID
                 lo_message_add_midi(oscm,m);
             }
@@ -1289,7 +1299,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         }
         else if(place != -1)
         {
-            sprintf(chunk, p->path[i], (int)(p->osc_scale[i]*(msg[place] - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i]));
+            sprintf(chunk, p->path[i], (int)(p->osc_scale[i]*(mymsg[place] - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i]));
         }
         else
         {
