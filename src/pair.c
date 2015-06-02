@@ -1254,7 +1254,13 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
     else
     {
         //anything matches a raw midi
-        //TODO: unless its full of constants, ranges etc...
+        //let's do a quick check here to make sure that the constant parts of
+        //the MIDI message match up; is that good enough? -ag
+        for(i=0;i<3;i++) {
+	    if(p->midi_map[i] == -1 &&
+	       (msg[i] < p->midi_val[i] || msg[i] > p->midi_rangemax[i]))
+	        return 0;
+	}
         for(i=0;i<p->argc;i++)
         {
             if(p->types[i] == 'm' && p->osc_map[i] != -1)
