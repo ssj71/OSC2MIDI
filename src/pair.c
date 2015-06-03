@@ -63,7 +63,7 @@ typedef struct _PAIR
    This stems from a discussion with Spencer on how to make partial
    assignments of OSC values work in reverse mappings (MIDI->OSC). This is
    needed for rules like the following which map a single, multi-argument OSC
-   message to separate MIDI messages:
+   message to several different MIDI messages:
 
      /2/xy1 ff, val,  : controlchange( 1, 1, 127*val );
      /2/xy1 ff, , val : controlchange( 1, 2, 127*val );
@@ -89,7 +89,7 @@ typedef struct _PAIR
    in the try_match_osc() and try_match_midi() routines below (watch out for
    code labeled "-ag"). */
 
-// Note sure what's a good magic number for the hash table size here, just
+// Not sure what's a good magic number for the hash table size here, just
 // make it large enough so that the buckets don't grow too large.
 #define TABLESZ 4711
 
