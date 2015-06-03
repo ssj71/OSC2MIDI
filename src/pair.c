@@ -1614,3 +1614,13 @@ char * opcode2cmd(uint8_t opcode, uint8_t noteoff)
             return "unknown";
     }
 }
+
+void print_midi(PAIRHANDLE ph, uint8_t msg[])
+{
+  PAIR* p = (PAIR*)ph;
+  if(p->raw_midi) // this needs special treatment
+    printf("%s ( %i, %i, %i )", opcode2cmd(p->opcode,1), msg[0], msg[1], msg[2]);
+  else
+    //TODO: make this variable number of args for program change etc
+    printf("%s ( %i, %i, %i )", opcode2cmd(msg[0],1), msg[0]&0x0F, msg[1], msg[2]);
+}

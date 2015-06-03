@@ -83,7 +83,8 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
 
     for(j=0;j<conv->npairs;j++)
     {
-        if( (n = try_match_osc(conv->p[j],(char *)path,(char *)types,argv,argc,&(conv->glob_chan),&(conv->glob_vel),&(conv->filter),midi)) )
+        PAIRHANDLE ph = conv->p[j];
+        if( (n = try_match_osc(ph,(char *)path,(char *)types,argv,argc,&(conv->glob_chan),&(conv->glob_vel),&(conv->filter),midi)) )
         {
             if(!conv->multi_match)
                 j = conv->npairs;
@@ -100,11 +101,12 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
                     printf(", ");
                     lo_arg_pp((lo_type)types[i], argv[i]);
                 }
+		printf(" -> ");
                 if(n>0)
-                    //TODO: make this variable number of args for program change etc
-                    printf(" -> %s ( %i, %i, %i )\n", opcode2cmd(midi[0],1), midi[0]&0x0F, midi[1], midi[2]);
+		    print_midi(ph, midi);
                 else
-                    printf(" -> %s ( %i )\n", opcode2cmd(midi[0],1), (int8_t) midi[1]);
+                    printf("%s ( %i )", opcode2cmd(midi[0],1), (int8_t) midi[1]);
+		printf("\n");
                 fflush(stdout);
             }
 
@@ -132,8 +134,9 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
 
         for(i=0;i<data->npairs;i++)
         {
+	    PAIRHANDLE ph = data->p[i];
             oscm = lo_message_new();
-            if( (n = try_match_midi(data->p[i], midi, &(data->glob_chan), path, oscm)) )
+            if( (n = try_match_midi(ph, midi, &(data->glob_chan), path, oscm)) )
             {
                 if(!data->multi_match)
                     i = data->npairs;
@@ -142,8 +145,9 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
                     if(first)
                         printf("matches found:\n");
                     first = 0;
-                    printf("  %s ( %i, %i, %i ) ->", opcode2cmd(midi[0],1), midi[0]&0x0F, midi[1], midi[2]);
-                    printf(" %s ", path);
+		    printf("  ");
+		    print_midi(ph, midi);
+                    printf(" -> %s ", path);
                     /*printf("%s", lo_message_get_types(oscm));
                     for (i = 0; i < lo_message_get_argc(oscm); i++) {
                         printf(", ");

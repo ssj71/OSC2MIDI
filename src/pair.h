@@ -16,6 +16,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
 void print_pair(PAIRHANDLE ph);
 int check_pair_set_for_filter(PAIRHANDLE* pa, int npair);
 char * opcode2cmd(uint8_t opcode, uint8_t noteoff);
+void print_midi(PAIRHANDLE ph, uint8_t msg[]);
 void init_regs(int n);
 
 #endif
