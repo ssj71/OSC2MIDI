@@ -19,6 +19,10 @@ typedef struct _PAIR
     int argc;
     int argc_in_path;
     char* types;
+
+    //hash key and register values (pairs with the same hash key share the same register vector)
+    int key;
+    float* regs;
     
     //conversion factors, separate factors are kept for osc->midi vs midi->osc, they are equivalent but its necessary for one to many mappings
     int8_t *osc_map;           //which byte in the midi message by index of var in OSC message (including in path args)
@@ -50,6 +54,125 @@ typedef struct _PAIR
 
 }PAIR;
 
+/*************************************************************************/
+
+/* Register implementation for keeping track of OSC values of partial mappings
+   Albert Graef <aggraef@gmail.com>, Computer Music Research Group, Johannes
+   Gutenberg University Mainz, June 2015
+
+   This stems from a discussion with Spencer on how to make partial
+   assignments of OSC values work in reverse mappings (MIDI->OSC). This is
+   needed for rules like the following which map a single, multi-argument OSC
+   message to separate MIDI messages:
+
+     /2/xy1 ff, val,  : controlchange( 1, 1, 127*val );
+     /2/xy1 ff, , val : controlchange( 1, 2, 127*val );
+
+   When receiving one of the MIDI messages on the right-hand side of such
+   rules, a complete OSC message has to be constructed which supplies values
+   to *all* arguments of the OSC message. To these ends, the present
+   implementation stores previously received values for all arguments
+   (obtained from previous OSC or MIDI messages) in a vector of "registers"
+   which is accessible to all rules for the same type of OSC message.
+
+   The (indexes of the) register vectors for each rule are kept in a hash
+   table indexed by path-argtype pairs. (Note that indexing by just the OSC
+   paths won't work, since the same path might be used with different argument
+   combinations.) This means that each rule for a given path-argtype pair will
+   get the same collection of registers. The hash table is constructed at
+   startup time, while reading the map file. Accessing the register values in
+   the real-time loop then just needs a constant-time lookup using a pointer
+   stored in each configuration pair, and thus incurs only minimal overhead.
+
+   After initialization, the necessary bookkeeping (storing received values in
+   registers, and retrieving stored values in the MIDI->OSC mappings) is done
+   in the try_match_osc() and try_match_midi() routines below (watch out for
+   code labeled "-ag"). */
+
+// Note sure what's a good magic number for the hash table size here, just
+// make it large enough so that the buckets don't grow too large.
+#define TABLESZ 4711
+
+#include <stdbool.h>
+#include "hashtable.h"
+
+table tab;
+
+// element type
+struct elem {
+  char* key;
+  int k;
+};
+typedef struct elem* elem;
+
+// key comparison
+bool ht_equal(ht_key s1, ht_key s2)
+{
+  return strcmp((char*)s1,(char*)s2) == 0;
+}
+
+// extracting keys from elements
+ht_key ht_getkey(ht_elem e)
+{
+  return ((elem)e)->key;
+}
+
+// hash function using an inlined random number generator -- this comes from
+// the sample code provided with Frank Pfenning's hash table implementation
+int ht_hash(ht_key s, int m)
+{
+  unsigned int a = 1664525;
+  unsigned int b = 1013904223;
+  unsigned int r = 0xdeadbeef;	       /* initial seed */
+  int len = strlen(s);
+  int i; unsigned int h = 0;	       /* empty string maps to 0 */
+  for (i = 0; i < len; i++)
+    {
+      h = r*h + ((char*)s)[i];	 /* mod 2^32 */
+      r = r*a + b;	 /* mod 2^32, linear congruential random no */
+    }
+  h = h % m;			/* reduce to range */
+  //@assert -m < (int)h && (int)h < m;
+  int hx = (int)h;
+  if (hx < 0) h += m;	/* make positive, if necessary */
+  return hx;
+}
+
+float **regs;
+int n_keys;
+
+void init_regs(int n)
+// This must be called once in the main program (cf. main.c) with n == the
+// number of config lines in the map, to allocate enough storage to hold all
+// the register pointers (note that there can be at most one entry per
+// configuration pair in the table).
+{
+  regs = (float**)calloc(n, sizeof(float*));
+}
+
+int strkey(char* path, char* argtypes)
+// Return a key (index into the regs table) which is unique for the given
+// path, argtypes pair.
+{
+  // According to the OSC spec, path may not contain a comma, so we can use
+  // that as a delimiter for the path,argtypes key value here.
+  char *key = malloc(strlen(path)+strlen(argtypes)+2);
+  sprintf(key, "%s,%s", path, argtypes);
+  // Make sure that the hash table is initialized.
+  if (!tab) tab = table_new(TABLESZ, ht_getkey, ht_equal, ht_hash);
+  ht_elem e = table_search(tab, key);
+  if (!e) {
+    // new key, add a new entry to the regs table
+    elem el = (elem)malloc(sizeof(struct elem));
+    el->key = key;
+    el->k = n_keys++;
+    table_insert(tab, el);
+    e = el;
+  }
+  return ((elem)e)->k;
+}
+
+/*************************************************************************/
 
 void print_pair(PAIRHANDLE ph)
 {
@@ -219,9 +342,8 @@ void rm_whitespace(char* str)
     }
 }
 
-int get_pair_path(char* config, PAIR* p)
+int get_pair_path(char* config, char* path, PAIR* p)
 {
-    char path[200];
     char* tmp,*prev;
     int n,i,j = 0;
     char var[100];
@@ -279,7 +401,7 @@ int get_pair_path(char* config, PAIR* p)
     return 0;
 }
 
-int get_pair_argtypes(char* config, PAIR* p)
+int get_pair_argtypes(char* config, char* path, PAIR* p)
 {
     char argtypes[100];
     int i,j = 0;
@@ -301,6 +423,14 @@ int get_pair_argtypes(char* config, PAIR* p)
     p->osc_const = (uint8_t*)malloc( sizeof(uint8_t) * (p->argc_in_path+len+1) );
     p->osc_val = (float*)malloc( sizeof(float) * (p->argc_in_path+len+1) );
     p->osc_rangemax = (float*)malloc( sizeof(float) * (p->argc_in_path+len+1) );
+
+    //initialize hash key and register storage -ag
+    p->key = strkey(path, argtypes);
+    p->regs = regs[p->key];
+    //allocate space for the register storage if not yet initialized
+    if(!p->regs) {
+        p->regs = regs[p->key] = (float*)calloc( p->argc_in_path+len+1, sizeof(float) );
+    }
 
     //now get the argument types
     for(i=0;i<len;i++)
@@ -848,6 +978,7 @@ PAIRHANDLE alloc_pair(char* config)
     //path argtypes, arg1, arg2, ... argn : midicommand(arg1+4, arg3, 2*arg4);
     PAIR* p;
     int n;
+    char path[200];
 
     p = (PAIR*)malloc(sizeof(PAIR));
 
@@ -861,11 +992,11 @@ PAIRHANDLE alloc_pair(char* config)
     p->midi_val[2] = 0;
 
     //config into separate parts
-    if(-1 == get_pair_path(config,p))
+    if(-1 == get_pair_path(config,path,p))
         return abort_pair_alloc(2,p);
 
 
-    if(-1 == get_pair_argtypes(config,p))
+    if(-1 == get_pair_argtypes(config,path,p))
         return abort_pair_alloc(3,p);
 
 
@@ -965,6 +1096,8 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
             //out of bounds of range or const
             return 0;
         }
+	//record the value for later use in reverse mapping (MIDI->OSC) -ag
+	p->regs[i] = v;
         path += n;
     }
     //compare the end of the path
@@ -1071,10 +1204,12 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                     msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F; 
                 }
             }
+	    //record the value for later use in reverse mapping -ag
+	    p->regs[i+p->argc_in_path] = val;
         }//if arg is used
-        else if(p->osc_const[i+p->argc_in_path])
+        else
         {
-            //arg not used but need to check if it matches constant or range
+            //arg not used but needs to be recorded, and we may have to check if it matches constant or range
             switch(types[i])
             {
                 case 'i':
@@ -1110,10 +1245,12 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
 
             }
             //check if it is in bounds of constant or range
-            if(val < p->osc_val[i+p->argc_in_path] || val > p->osc_rangemax[i+p->argc_in_path])
+            if(p->osc_const[i+p->argc_in_path] && (val < p->osc_val[i+p->argc_in_path] || val > p->osc_rangemax[i+p->argc_in_path]))
             {
                 return 0;
             }
+	    //record the value for later use in reverse mapping -ag
+	    p->regs[i+p->argc_in_path] = val;
         }
     }//for args
     return 1;
@@ -1249,15 +1386,27 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
             else if(place != -1)
             {
 	        int midival = mymsg[place];
+		float val;
 		if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
 		{
 		    midival += mymsg[place+1]*128;
 		}
-                load_osc_value( oscm,p->types[i],p->osc_scale[i+p->argc_in_path]*((float)midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path] );
+		val = p->osc_scale[i+p->argc_in_path]*((float)midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path];
+		//record the value for later use in reverse mapping -ag
+		p->regs[i+p->argc_in_path] = val;
+                load_osc_value( oscm,p->types[i],val );
             }
             else
             {
-                load_osc_value( oscm, p->types[i], p->osc_val[i + p->argc_in_path] );//if it's not a constant, then this is set to default 0
+	        // value not in message, grab previously recorded value -ag
+	        float val = p->regs[i+p->argc_in_path];
+		// prescribed range of the message (if it's not a constant, then this is set to default 0)
+		float min = p->osc_val[i + p->argc_in_path],
+		    max = p->osc_rangemax[i + p->argc_in_path];
+		// fall back to default value if the recorded value falls out of the prescribed range
+		if (p->osc_const[i+p->argc_in_path] && (val < min || val > max))
+		    val = min;
+                load_osc_value( oscm, p->types[i], val );
             }
         }
     }
@@ -1283,7 +1432,14 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
             }
             else
             {
-                load_osc_value( oscm, p->types[i], p->osc_val[i + p->argc_in_path] );//we have no idea what should be in these, so just load a 0
+	        //we have no idea what should be in these, so just load a previously recorded value or the defaults
+	        //XXXFIXME: shouldn't we look for parameters which are mapped to arguments of rawmidi here, like in the !raw_midi case? -ag
+	        float val = p->regs[i+p->argc_in_path];
+		float min = p->osc_val[i + p->argc_in_path],
+		    max = p->osc_rangemax[i + p->argc_in_path];
+		if (p->osc_const[i+p->argc_in_path] && (val < min || val > max))
+		    val = min;
+                load_osc_value( oscm, p->types[i], val );
             }
         }
     }
@@ -1299,11 +1455,19 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         }
         else if(place != -1)
         {
-            sprintf(chunk, p->path[i], (int)(p->osc_scale[i]*(mymsg[place] - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i]));
+	    float val = p->osc_scale[i]*(mymsg[place] - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i];
+	    //record the value for later use in reverse mapping -ag
+	    p->regs[i] = val;
+            sprintf(chunk, p->path[i], (int)val);
         }
         else
         {
-            sprintf(chunk, p->path[i], (int)p->osc_val[i]);
+	    // value not in message, grab previously recorded value -ag
+	    float val = p->regs[i];
+	    float min = p->osc_val[i], max = p->osc_rangemax[i];
+	    if (p->osc_const[i] && (val < min || val > max))
+	        val = min;
+            sprintf(chunk, p->path[i], (int)val);
         }
         strcat(path, chunk);
     }

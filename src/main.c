@@ -126,6 +126,8 @@ int load_map(CONVERTER* conv, char* file)
     }
 
     p = (PAIRHANDLE*)malloc(sizeof(PAIRHANDLE)*i);
+    //initialize the register table (cf. pair.c) -ag
+    init_regs(i);
     rewind(map);
     i=0;
     while(!feof(map))

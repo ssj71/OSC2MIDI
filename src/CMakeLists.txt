@@ -18,6 +18,7 @@ link_directories (${LO_LIBRARY_DIRS} ${JACK_LIBRARY_DIRS})
 
 add_executable(osc2midi
   pair.c
+  hashtable.c
   oscserver.c
   jackdriver.c
   main.c
