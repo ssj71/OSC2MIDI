@@ -124,13 +124,13 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
 void convert_midi_in(lo_address addr, CONVERTER* data)
 {
     uint8_t i,n;
-    uint8_t first = 1;
     uint8_t midi[3];
 
     while(pop_midi(data->seq,midi))
     {
         char path[200];
         lo_message oscm;
+	uint8_t first = 1;
 
         for(i=0;i<data->npairs;i++)
         {
@@ -163,5 +163,7 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
             }
             lo_message_free(oscm);
         }
+	if(data->verbose && !first)
+	    printf("\n");
     }
 }
