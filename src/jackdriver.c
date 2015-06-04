@@ -40,10 +40,11 @@
 #include "jackdriver.h"
 
 
-typedef struct _MidiMessage {
-	jack_nframes_t	time;
-	int		len;	/* Length of MIDI message, in bytes. */
-	uint8_t	data[3];
+typedef struct _MidiMessage
+{
+    jack_nframes_t	time;
+    int		len;	/* Length of MIDI message, in bytes. */
+    uint8_t	data[3];
 } MidiMessage;
 
 #define RINGBUFFER_SIZE		256*sizeof(MidiMessage)
@@ -59,108 +60,115 @@ typedef struct _MidiMessage {
 //These functions operate in the JACK RT Thread
 ///////////////////////////////////////////////
 
-double 
+double
 get_time(void)
 {
-	double seconds;
-	int ret;
-	struct timeval tv;
+    double seconds;
+    int ret;
+    struct timeval tv;
 
-	ret = gettimeofday(&tv, NULL);
+    ret = gettimeofday(&tv, NULL);
 
-	if (ret) {
-		perror("gettimeofday");
-		exit(EX_OSERR);
-	}
+    if (ret)
+    {
+        perror("gettimeofday");
+        exit(EX_OSERR);
+    }
 
-	seconds = tv.tv_sec + tv.tv_usec / 1000000.0;
+    seconds = tv.tv_sec + tv.tv_usec / 1000000.0;
 
-	return (seconds);
+    return (seconds);
 }
 
 double
 get_delta_time(void)
 {
-	static double previously = -1.0;
-	double now;
-	double delta;
+    static double previously = -1.0;
+    double now;
+    double delta;
 
-	now = get_time();
+    now = get_time();
 
-	if (previously == -1.0) {
-		previously = now;
+    if (previously == -1.0)
+    {
+        previously = now;
 
-		return (0);
-	}
+        return (0);
+    }
 
-	delta = now - previously;
-	previously = now;
+    delta = now - previously;
+    previously = now;
 
-	assert(delta >= 0.0);
+    assert(delta >= 0.0);
 
-	return (delta);
+    return (delta);
 }
 
 
 double
 nframes_to_ms(jack_client_t* jack_client,jack_nframes_t nframes)
 {
-	jack_nframes_t sr;
+    jack_nframes_t sr;
 
-	sr = jack_get_sample_rate(jack_client);
+    sr = jack_get_sample_rate(jack_client);
 
-	assert(sr > 0);
+    assert(sr > 0);
 
-	return ((nframes * 1000.0) / (double)sr);
+    return ((nframes * 1000.0) / (double)sr);
 }
 
 void
 queue_message(jack_ringbuffer_t* ringbuffer, MidiMessage *ev)
 {
-	int written;
+    int written;
 
-	if (jack_ringbuffer_write_space(ringbuffer) < sizeof(*ev)) {
-		printf("Not enough space in the ringbuffer, MIDI LOST.");
-		return;
-	}
+    if (jack_ringbuffer_write_space(ringbuffer) < sizeof(*ev))
+    {
+        printf("Not enough space in the ringbuffer, MIDI LOST.");
+        return;
+    }
 
-	written = jack_ringbuffer_write(ringbuffer, (char *)ev, sizeof(*ev));
+    written = jack_ringbuffer_write(ringbuffer, (char *)ev, sizeof(*ev));
 
-	if (written != sizeof(*ev))
+    if (written != sizeof(*ev))
         printf("jack_ringbuffer_write failed, MIDI LOST.");
 }
 
 void
 process_midi_input(JACK_SEQ* seq,jack_nframes_t nframes)
 {
-	int read, events, i;
-	void *port_buffer;
+    int read, events, i;
+    void *port_buffer;
     MidiMessage rev;
-	jack_midi_event_t event;
+    jack_midi_event_t event;
 
-	port_buffer = jack_port_get_buffer(seq->input_port, nframes);
-	if (port_buffer == NULL) {
-		printf("jack_port_get_buffer failed, cannot receive anything.");
-		return;
-	}
-
-#ifdef JACK_MIDI_NEEDS_NFRAMES
-	events = jack_midi_get_event_count(port_buffer, nframes);
-#else
-	events = jack_midi_get_event_count(port_buffer);
-#endif
-
-	for (i = 0; i < events; i++) {
+    port_buffer = jack_port_get_buffer(seq->input_port, nframes);
+    if (port_buffer == NULL)
+    {
+        printf("jack_port_get_buffer failed, cannot receive anything.");
+        return;
+    }
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
-		read = jack_midi_event_get(&event, port_buffer, i, nframes);
+    events = jack_midi_get_event_count(port_buffer, nframes);
 #else
-		read = jack_midi_event_get(&event, port_buffer, i);
+    events = jack_midi_get_event_count(port_buffer);
 #endif
-		if (!read) {
-			//successful event get
 
-            if (event.size <= 3 && event.size >=1) {
+    for (i = 0; i < events; i++)
+    {
+
+#ifdef JACK_MIDI_NEEDS_NFRAMES
+        read = jack_midi_event_get(&event, port_buffer, i, nframes);
+#else
+        read = jack_midi_event_get(&event, port_buffer, i);
+#endif
+        if (!read)
+        {
+            //successful event get
+
+            if (event.size <= 3 && event.size >=1)
+            {
                 //not sysex or something
 
                 //PUSH ONTO CIRCULAR BUFFER
@@ -170,37 +178,39 @@ process_midi_input(JACK_SEQ* seq,jack_nframes_t nframes)
                 memcpy(rev.data, event.buffer, rev.len);
                 queue_message(seq->ringbuffer_in,&rev);
             }
-		}
+        }
 
 
-	}
+    }
 }
 
 void
 process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
 {
-	int read, events, i, j;
+    int read, events, i, j;
     uint8_t* buffer;
     int8_t filter = *seq->filter;
-	void *inport_buffer;
-	void *outport_buffer;
-	jack_midi_event_t event;
+    void *inport_buffer;
+    void *outport_buffer;
+    jack_midi_event_t event;
 
-	inport_buffer = jack_port_get_buffer(seq->filter_in_port, nframes);
-	if (inport_buffer == NULL) {
-		printf("jack_port_get_buffer failed, cannot receive anything.");
-		return;
-	}
-	outport_buffer = jack_port_get_buffer(seq->filter_out_port, nframes);
-	if (outport_buffer == NULL) {
-		printf("jack_port_get_buffer failed, cannot send anything.");
-		return;
-	}
+    inport_buffer = jack_port_get_buffer(seq->filter_in_port, nframes);
+    if (inport_buffer == NULL)
+    {
+        printf("jack_port_get_buffer failed, cannot receive anything.");
+        return;
+    }
+    outport_buffer = jack_port_get_buffer(seq->filter_out_port, nframes);
+    if (outport_buffer == NULL)
+    {
+        printf("jack_port_get_buffer failed, cannot send anything.");
+        return;
+    }
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
-	jack_midi_clear_buffer(outport_buffer, nframes);
+    jack_midi_clear_buffer(outport_buffer, nframes);
 #else
-	jack_midi_clear_buffer(outport_buffer);
+    jack_midi_clear_buffer(outport_buffer);
 #endif
 
     //check if filter shift amount has changed
@@ -210,7 +220,7 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
         event.buffer = data;
         event.size = 3;
         //turn off all currently on notes and send new note-ons
-        for(j=0;j<seq->nnotes;j++)
+        for(j=0; j<seq->nnotes; j++)
         {
             event.buffer[0] = seq->notechan[j]&0xEF;//note on to note off
             event.buffer[1] = seq->note[j]+seq->old_filter;
@@ -221,14 +231,15 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
             buffer = jack_midi_event_reserve(outport_buffer, 0, 3);
 #endif
 
-            if (buffer == NULL) {
+            if (buffer == NULL)
+            {
                 //warn_from_jack_thread_context("jack_midi_event_reserve failed, NOTE LOST.");
                 break;
             }
 
             memcpy(buffer, event.buffer, 3);
         }
-        for(j=0;j<seq->nnotes;j++)
+        for(j=0; j<seq->nnotes; j++)
         {
             event.buffer[0] = seq->notechan[j];//note on
             event.buffer[1] = seq->note[j]+filter;
@@ -239,7 +250,8 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
             buffer = jack_midi_event_reserve(outport_buffer, 0, 3);
 #endif
 
-            if (buffer == NULL) {
+            if (buffer == NULL)
+            {
                 //warn_from_jack_thread_context("jack_midi_event_reserve failed, NOTE LOST.");
                 break;
             }
@@ -250,32 +262,35 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
     }
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
-	events = jack_midi_get_event_count(inport_buffer, nframes);
+    events = jack_midi_get_event_count(inport_buffer, nframes);
 #else
-	events = jack_midi_get_event_count(inport_buffer);
+    events = jack_midi_get_event_count(inport_buffer);
 #endif
 
 
-	for (i = 0; i < events; i++) {
+    for (i = 0; i < events; i++)
+    {
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
-		read = jack_midi_event_get(&event, inport_buffer, i, nframes);
+        read = jack_midi_event_get(&event, inport_buffer, i, nframes);
 #else
-		read = jack_midi_event_get(&event, inport_buffer, i);
+        read = jack_midi_event_get(&event, inport_buffer, i);
 #endif
-		if (!read) {
-			//successful event get
+        if (!read)
+        {
+            //successful event get
 
             //filter if note
-            if (event.size <= 3 && event.size >=1) {
+            if (event.size <= 3 && event.size >=1)
+            {
                 //not sysex or something
-                
+
                 if((event.buffer[0]&0xF0) == 0x80)
                 {
                     uint8_t on = seq->note[0];
                     //note off event
                     //remove it from list
-                    for(j=0;j<seq->nnotes;j++)
+                    for(j=0; j<seq->nnotes; j++)
                     {
                         //find it and shift everything above it down 1
                         if(j && on == event.buffer[1])
@@ -298,7 +313,7 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                 else if((event.buffer[0]&0xF0) == 0x90)
                 {
                     //note on event
-                    for(j=0;j<seq->nnotes;j++)
+                    for(j=0; j<seq->nnotes; j++)
                     {
                         //check if it's already on the list
                         if(seq->note[j] == event.buffer[1])
@@ -315,7 +330,7 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                     }
                     event.buffer[1] += filter;
                 }
-                
+
             }
 
             //copy to output
@@ -325,86 +340,91 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
             buffer = jack_midi_event_reserve(outport_buffer, event.time, event.size);
 #endif
 
-            if (buffer == NULL) {
+            if (buffer == NULL)
+            {
                 //warn_from_jack_thread_context("jack_midi_event_reserve failed, NOTE LOST.");
                 break;
             }
 
             memcpy(buffer, event.buffer, event.size);
-		}
+        }
 
-	}
+    }
 }
 
 void
 process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 {
-	int read, t;
-	uint8_t *buffer;
-	void *port_buffer;
-	jack_nframes_t last_frame_time;
-	MidiMessage ev;
+    int read, t;
+    uint8_t *buffer;
+    void *port_buffer;
+    jack_nframes_t last_frame_time;
+    MidiMessage ev;
 
-	last_frame_time = jack_last_frame_time(seq->jack_client);
+    last_frame_time = jack_last_frame_time(seq->jack_client);
 
-	port_buffer = jack_port_get_buffer(seq->output_port, nframes);
-	if (port_buffer == NULL) {
-		printf("jack_port_get_buffer failed, cannot send anything.");
-		return;
-	}
+    port_buffer = jack_port_get_buffer(seq->output_port, nframes);
+    if (port_buffer == NULL)
+    {
+        printf("jack_port_get_buffer failed, cannot send anything.");
+        return;
+    }
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
-	jack_midi_clear_buffer(port_buffer, nframes);
+    jack_midi_clear_buffer(port_buffer, nframes);
 #else
-	jack_midi_clear_buffer(port_buffer);
+    jack_midi_clear_buffer(port_buffer);
 #endif
 
-	while (jack_ringbuffer_read_space(seq->ringbuffer_out)) {
-		read = jack_ringbuffer_peek(seq->ringbuffer_out, (char *)&ev, sizeof(ev));
+    while (jack_ringbuffer_read_space(seq->ringbuffer_out))
+    {
+        read = jack_ringbuffer_peek(seq->ringbuffer_out, (char *)&ev, sizeof(ev));
 
-		if (read != sizeof(ev)) {
+        if (read != sizeof(ev))
+        {
             //warn_from_jack_thread_context("Short read from the ringbuffer, possible note loss.");
-			jack_ringbuffer_read_advance(seq->ringbuffer_out, read);
-			continue;
-		}
+            jack_ringbuffer_read_advance(seq->ringbuffer_out, read);
+            continue;
+        }
 
-		t = ev.time + nframes - last_frame_time;
+        t = ev.time + nframes - last_frame_time;
 
-		/* If computed time is too much into the future, we'll need
-		   to send it later. */
-		if (t >= (int)nframes)
-			break;
+        /* If computed time is too much into the future, we'll need
+           to send it later. */
+        if (t >= (int)nframes)
+            break;
 
-		/* If computed time is < 0, we missed a cycle because of xrun. */
-		if (t < 0)
-			t = 0;
+        /* If computed time is < 0, we missed a cycle because of xrun. */
+        if (t < 0)
+            t = 0;
 
-		jack_ringbuffer_read_advance(seq->ringbuffer_out, sizeof(ev));
+        jack_ringbuffer_read_advance(seq->ringbuffer_out, sizeof(ev));
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
-		buffer = jack_midi_event_reserve(port_buffer, t, ev.len, nframes);
+        buffer = jack_midi_event_reserve(port_buffer, t, ev.len, nframes);
 #else
-		buffer = jack_midi_event_reserve(port_buffer, t, ev.len);
+        buffer = jack_midi_event_reserve(port_buffer, t, ev.len);
 #endif
 
-		if (buffer == NULL) {
+        if (buffer == NULL)
+        {
             //warn_from_jack_thread_context("jack_midi_event_reserve failed, NOTE LOST.");
-			break;
-		}
+            break;
+        }
 
-		memcpy(buffer, ev.data, ev.len);
-	}
+        memcpy(buffer, ev.data, ev.len);
+    }
 }
 
 // in, i+o, i+o+t, o+t, out
 
-int 
+int
 process_callback(jack_nframes_t nframes, void *seqq)
 {
-     JACK_SEQ* seq = (JACK_SEQ*)seqq;
+    JACK_SEQ* seq = (JACK_SEQ*)seqq;
 #ifdef MEASURE_TIME
-	if (get_delta_time() > MAX_TIME_BETWEEN_CALLBACKS)
-		printf("Had to wait too long for JACK callback; scheduling problem?");
+    if (get_delta_time() > MAX_TIME_BETWEEN_CALLBACKS)
+        printf("Had to wait too long for JACK callback; scheduling problem?");
 #endif
 
     if(seq->usein)
@@ -415,11 +435,11 @@ process_callback(jack_nframes_t nframes, void *seqq)
         process_midi_output( seq,nframes );
 
 #ifdef MEASURE_TIME
-	if (get_delta_time() > MAX_PROCESSING_TIME)
-		printf("Processing took too long; scheduling problem?");
+    if (get_delta_time() > MAX_PROCESSING_TIME)
+        printf("Processing took too long; scheduling problem?");
 #endif
 
-	return (0);
+    return (0);
 }
 
 ///////////////////////////////////////////////
@@ -444,21 +464,23 @@ int pop_midi(void* seqq, uint8_t msg[])
     MidiMessage ev;
     JACK_SEQ* seq = (JACK_SEQ*)seqq;
 
-	if (jack_ringbuffer_read_space(seq->ringbuffer_in)) {
-		read = jack_ringbuffer_peek(seq->ringbuffer_in, (char *)&ev, sizeof(ev));
+    if (jack_ringbuffer_read_space(seq->ringbuffer_in))
+    {
+        read = jack_ringbuffer_peek(seq->ringbuffer_in, (char *)&ev, sizeof(ev));
 
-		if (read != sizeof(ev)) {
+        if (read != sizeof(ev))
+        {
             //warn_from_jack_thread_context("Short read from the ringbuffer, possible note loss.");
-			jack_ringbuffer_read_advance(seq->ringbuffer_in, read);
-			return -1;
-		}
+            jack_ringbuffer_read_advance(seq->ringbuffer_in, read);
+            return -1;
+        }
 
-		jack_ringbuffer_read_advance(seq->ringbuffer_in, sizeof(ev));
+        jack_ringbuffer_read_advance(seq->ringbuffer_in, sizeof(ev));
 
         memcpy(msg,ev.data,ev.len);
 
         return ev.len;
-	}
+    }
     else
         return 0;
 }
@@ -466,86 +488,97 @@ int pop_midi(void* seqq, uint8_t msg[])
 ////////////////////////////////
 //this is run in the main thread
 ////////////////////////////////
-int 
+int
 init_jack(JACK_SEQ* seq, uint8_t verbose)
 {
-	int err;
+    int err;
 
     seq->nnotes = 0;
     seq->old_filter = 0;
     if(verbose)printf("opening client...\n");
     seq->jack_client = jack_client_open("osc2midi", JackNullOption, NULL);
 
-	if (seq->jack_client == NULL) {
+    if (seq->jack_client == NULL)
+    {
         printf("Could not connect to the JACK server; run jackd first?\n");
-	return 0;
-	}
+        return 0;
+    }
 
     if(verbose)printf("assigning process callback...\n");
     err = jack_set_process_callback(seq->jack_client, process_callback, (void*)seq);
-    if (err) {
+    if (err)
+    {
         printf("Could not register JACK process callback.\n");
-    return 0; 
+        return 0;
     }
 
-    if(seq->usein){
-        
+    if(seq->usein)
+    {
+
         if(verbose)printf("initializing JACK input: \ncreating ringbuffer...\n");
         seq->ringbuffer_in = jack_ringbuffer_create(RINGBUFFER_SIZE);
 
-        if (seq->ringbuffer_in == NULL) {
+        if (seq->ringbuffer_in == NULL)
+        {
             printf("Cannot create JACK ringbuffer.\n");
-        return 0;
+            return 0;
         }
 
         jack_ringbuffer_mlock(seq->ringbuffer_in);
 
         seq->input_port = jack_port_register(seq->jack_client, "midi_in", JACK_DEFAULT_MIDI_TYPE,
-            JackPortIsInput, 0);
+                                             JackPortIsInput, 0);
 
-        if (seq->input_port == NULL) {
+        if (seq->input_port == NULL)
+        {
             printf("Could not register JACK port.\n");
-        return 0;
+            return 0;
         }
     }
-    if(seq->useout){
-        
+    if(seq->useout)
+    {
+
         if(verbose)printf("initializing JACK output: \ncreating ringbuffer...\n");
         seq->ringbuffer_out = jack_ringbuffer_create(RINGBUFFER_SIZE);
 
-        if (seq->ringbuffer_out == NULL){
+        if (seq->ringbuffer_out == NULL)
+        {
             printf("Cannot create JACK ringbuffer.\n");
-        return 0;
+            return 0;
         }
 
         jack_ringbuffer_mlock(seq->ringbuffer_out);
 
         seq->output_port = jack_port_register(seq->jack_client, "midi_out", JACK_DEFAULT_MIDI_TYPE,
-            JackPortIsOutput, 0);
+                                              JackPortIsOutput, 0);
 
-        if (seq->output_port == NULL) {
+        if (seq->output_port == NULL)
+        {
             printf("Could not register JACK port.\n");
-        return 0;
+            return 0;
         }
     }
-    if(seq->usefilter){
+    if(seq->usefilter)
+    {
         if(verbose)printf("initializing JACK midi filter in/out pair...\n");
         seq->filter_in_port = jack_port_register(seq->jack_client, "filter_in", JACK_DEFAULT_MIDI_TYPE,
-            JackPortIsInput, 0);
+                              JackPortIsInput, 0);
         seq->filter_out_port = jack_port_register(seq->jack_client, "filter_out", JACK_DEFAULT_MIDI_TYPE,
-            JackPortIsOutput, 0);
+                               JackPortIsOutput, 0);
 
-        if (seq->filter_in_port == NULL || seq->filter_out_port == NULL) {
+        if (seq->filter_in_port == NULL || seq->filter_out_port == NULL)
+        {
             printf("Could not register JACK port.\n");
-        return 0;
+            return 0;
         }
     }
 
-	if (jack_activate(seq->jack_client)) {
+    if (jack_activate(seq->jack_client))
+    {
         printf("Cannot activate JACK client.\n");
-	return 0;
-	}
-	return 1;
+        return 0;
+    }
+    return 1;
 }
 
 void close_jack(JACK_SEQ* seq)

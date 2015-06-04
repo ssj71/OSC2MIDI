@@ -25,10 +25,10 @@ void quitter(int sig)
 int is_empty(const char *s)
 // check whether a config line is empty or just a comment
 {
-    while (*s != '\0') 
+    while (*s != '\0')
     {
         if (*s == '#')
-	    return 1;
+            return 1;
         else if (!isspace(*s))
             return 0;
         s++;
@@ -49,17 +49,17 @@ int load_map(CONVERTER* conv, char* file)
     //from stdin
     if(use_stdin)
     {
-      strcpy(path, "<stdin>");
-      map = stdin;
+        strcpy(path, "<stdin>");
+        map = stdin;
     }
     //absolute path
     if(!map)
     {
-      map = fopen(strcpy(path,file),"r");
+        map = fopen(strcpy(path,file),"r");
     }
     if(!map)
     {
-      map = fopen(strcat(path,".omm"),"r");
+        map = fopen(strcat(path,".omm"),"r");
     }
     if(!map)
     {
@@ -73,7 +73,7 @@ int load_map(CONVERTER* conv, char* file)
         }
         else
         {
-            strcpy(path,home); 
+            strcpy(path,home);
         }
         strcat(path,"/osc2midi/");
         map = fopen(strcat(path,file),"r");
@@ -139,7 +139,7 @@ int load_map(CONVERTER* conv, char* file)
     while(!feof(map))
     {
         if (!fgets(line,400,map)) break;
-	if (use_stdin) fputs(line,tmp);
+        if (use_stdin) fputs(line,tmp);
         if(!is_empty(line))
             i++;//line is not commented out and not empty
     }
@@ -175,7 +175,7 @@ int load_map(CONVERTER* conv, char* file)
     conv->npairs = i;
     conv->p = p;
     return i;
-} 
+}
 
 void useage()
 {
@@ -236,93 +236,93 @@ int main(int argc, char** argv)
     seq.usefilter = 0;
     if(argc>1)
     {
-    for (i = 1;i<argc;i++)
-    {
-        if(strcmp(argv[i], "-single") ==0)
+        for (i = 1; i<argc; i++)
         {
-            //monitor mode (osc messages)
-            conv.multi_match = 0;
-        }
-        else if(strcmp(argv[i], "-multi") ==0)
-        {
-            //monitor mode (osc messages)
-            conv.multi_match = 1;
-        }
-        else if (strcmp(argv[i], "-map") == 0) 
-        {
-            //load map file
-            strcpy(file,argv[++i]);
-        }
-        else if(strcmp(argv[i], "-mon") ==0)
-        {
-            //monitor mode (osc messages)
-            conv.mon_mode = 1;
-            conv.convert = 1;
-        }
-        else if(strcmp(argv[i], "-m2o") ==0)
-        {
-            //monitor mode (osc messages)
-            conv.convert = 1;
-        }
-        else if(strcmp(argv[i], "-o2m") ==0)
-        {
-            //monitor mode (osc messages)
-            conv.convert = -1;
-        }
-        else if (strcmp(argv[i], "-m") == 0) 
-        {
-            //load map file
-            strcpy(file,argv[++i]);
-        }
-        else if(strcmp(argv[i], "-p") ==0)
-        {
-            //set osc server port
-            strcpy(port,argv[++i]);
-        }
-        else if(strcmp(argv[i], "-a") ==0)
-        {
-            //osc client address to send return osc messaged so
-            //strcpy(addr,argv[++i]);
-            if(!sscanf(argv[++i],"%[^:]:%[^:]",addr,aport))
+            if(strcmp(argv[i], "-single") ==0)
             {
-                sscanf(argv[i],":%[^:]",aport);
+                //monitor mode (osc messages)
+                conv.multi_match = 0;
             }
-        }
-        else if(strcmp(argv[i], "-c") ==0)
-        {
-            // global channel
-            conv.glob_chan = atoi(argv[++i]);
-        }
-        else if(strcmp(argv[i], "-vel") ==0)
-        {
-            // global velocity
-            conv.glob_vel = atoi(argv[++i]);
-        }
-        else if(strcmp(argv[i], "-s") == 0)
-        {
-            // filter shift
-            conv.filter = atoi(argv[++i]);
-            seq.usefilter = 1;
-            seq.filter = &conv.filter;
-        }
-        else if (strcmp(argv[i], "-v") == 0) 
-        {
-             conv.verbose = 1;
-        }
-        else if (strcmp(argv[i], "-h") == 0) 
-        {
-            //help
-            useage();
-            return -1;
-        }
-        else
-        {
-            printf("Unknown argument! %s\n",argv[i]);
-            useage();
-            return -1; 
-        }
+            else if(strcmp(argv[i], "-multi") ==0)
+            {
+                //monitor mode (osc messages)
+                conv.multi_match = 1;
+            }
+            else if (strcmp(argv[i], "-map") == 0)
+            {
+                //load map file
+                strcpy(file,argv[++i]);
+            }
+            else if(strcmp(argv[i], "-mon") ==0)
+            {
+                //monitor mode (osc messages)
+                conv.mon_mode = 1;
+                conv.convert = 1;
+            }
+            else if(strcmp(argv[i], "-m2o") ==0)
+            {
+                //monitor mode (osc messages)
+                conv.convert = 1;
+            }
+            else if(strcmp(argv[i], "-o2m") ==0)
+            {
+                //monitor mode (osc messages)
+                conv.convert = -1;
+            }
+            else if (strcmp(argv[i], "-m") == 0)
+            {
+                //load map file
+                strcpy(file,argv[++i]);
+            }
+            else if(strcmp(argv[i], "-p") ==0)
+            {
+                //set osc server port
+                strcpy(port,argv[++i]);
+            }
+            else if(strcmp(argv[i], "-a") ==0)
+            {
+                //osc client address to send return osc messaged so
+                //strcpy(addr,argv[++i]);
+                if(!sscanf(argv[++i],"%[^:]:%[^:]",addr,aport))
+                {
+                    sscanf(argv[i],":%[^:]",aport);
+                }
+            }
+            else if(strcmp(argv[i], "-c") ==0)
+            {
+                // global channel
+                conv.glob_chan = atoi(argv[++i]);
+            }
+            else if(strcmp(argv[i], "-vel") ==0)
+            {
+                // global velocity
+                conv.glob_vel = atoi(argv[++i]);
+            }
+            else if(strcmp(argv[i], "-s") == 0)
+            {
+                // filter shift
+                conv.filter = atoi(argv[++i]);
+                seq.usefilter = 1;
+                seq.filter = &conv.filter;
+            }
+            else if (strcmp(argv[i], "-v") == 0)
+            {
+                conv.verbose = 1;
+            }
+            else if (strcmp(argv[i], "-h") == 0)
+            {
+                //help
+                useage();
+                return -1;
+            }
+            else
+            {
+                printf("Unknown argument! %s\n",argv[i]);
+                useage();
+                return -1;
+            }
 
-    }
+        }
     }//get args
 
 
@@ -334,7 +334,7 @@ int main(int argc, char** argv)
         {
             seq.usefilter = 1;
             seq.filter = &conv.filter;
-                printf("Found pair %i with filter functions, creating midi filter in/out pair.\n", i); 
+            printf("Found pair %i with filter functions, creating midi filter in/out pair.\n", i);
         }
     }
     else if(conv.verbose)

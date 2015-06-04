@@ -16,9 +16,9 @@ int done = 0;
 void error(int num, const char *m, const char *path);
 
 int mon_handler(const char *path, const char *types, lo_arg ** argv,
-                    int argc, void *data, void *user_data);
+                int argc, void *data, void *user_data);
 int msg_handler(const char *path, const char *types, lo_arg ** argv,
-                    int argc, void *data, void *user_data);
+                int argc, void *data, void *user_data);
 
 
 lo_server_thread start_osc_server(char* port, CONVERTER* data)
@@ -54,15 +54,17 @@ void error(int num, const char *msg, const char *path)
 /* catch any incoming messages and display them. returning 1 means that the
  * message has not been fully handled and the server should try other methods */
 int mon_handler(const char *path, const char *types, lo_arg ** argv,
-                    int argc, void *data, void *user_data)
+                int argc, void *data, void *user_data)
 {
     int i;
 
     printf("%s ", path);
-    for (i = 0; i < argc; i++) {
+    for (i = 0; i < argc; i++)
+    {
         printf("%c", types[i]);
     }
-    for (i = 0; i < argc; i++) {
+    for (i = 0; i < argc; i++)
+    {
         printf(", ");
         lo_arg_pp((lo_type)types[i], argv[i]);
     }
@@ -74,14 +76,14 @@ int mon_handler(const char *path, const char *types, lo_arg ** argv,
 
 //this handles the osc to midi conversions
 int msg_handler(const char *path, const char *types, lo_arg ** argv,
-                    int argc, void *data, void *user_data)
+                int argc, void *data, void *user_data)
 {
     int i,j,n;
     uint8_t first = 1;
     uint8_t midi[3];
     CONVERTER* conv = (CONVERTER*)user_data;
 
-    for(j=0;j<conv->npairs;j++)
+    for(j=0; j<conv->npairs; j++)
     {
         PAIRHANDLE ph = conv->p[j];
         if( (n = try_match_osc(ph,(char *)path,(char *)types,argv,argc,&(conv->glob_chan),&(conv->glob_vel),&(conv->filter),midi)) )
@@ -94,19 +96,21 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
                     printf("matches found:\n");
                 first = 0;
                 printf("  %s ", path);
-                for (i = 0; i < argc; i++) {
+                for (i = 0; i < argc; i++)
+                {
                     printf("%c", types[i]);
                 }
-                for (i = 0; i < argc; i++) {
+                for (i = 0; i < argc; i++)
+                {
                     printf(", ");
                     lo_arg_pp((lo_type)types[i], argv[i]);
                 }
-		printf(" -> ");
+                printf(" -> ");
                 if(n>0)
-		    print_midi(ph, midi);
+                    print_midi(ph, midi);
                 else
                     printf("%s ( %i )", opcode2cmd(midi[0],1), (int8_t) midi[1]);
-		printf("\n");
+                printf("\n");
                 fflush(stdout);
             }
 
@@ -130,11 +134,11 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
     {
         char path[200];
         lo_message oscm;
-	uint8_t first = 1;
+        uint8_t first = 1;
 
-        for(i=0;i<data->npairs;i++)
+        for(i=0; i<data->npairs; i++)
         {
-	    PAIRHANDLE ph = data->p[i];
+            PAIRHANDLE ph = data->p[i];
             oscm = lo_message_new();
             if( (n = try_match_midi(ph, midi, &(data->glob_chan), path, oscm)) )
             {
@@ -145,8 +149,8 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
                     if(first)
                         printf("matches found:\n");
                     first = 0;
-		    printf("  ");
-		    print_midi(ph, midi);
+                    printf("  ");
+                    print_midi(ph, midi);
                     printf(" -> %s ", path);
                     /*printf("%s", lo_message_get_types(oscm));
                     for (i = 0; i < lo_message_get_argc(oscm); i++) {
@@ -163,7 +167,7 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
             }
             lo_message_free(oscm);
         }
-	if(data->verbose && !first)
-	    printf("\n");
+        if(data->verbose && !first)
+            printf("\n");
     }
 }
