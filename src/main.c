@@ -40,12 +40,23 @@ int load_map(CONVERTER* conv, char* file)
 {
     int i;
     char path[200],line[400],*home;
-    FILE* map;
+    FILE* map = NULL;
+    FILE* tmp = NULL;
     PAIRHANDLE *p;
+    int use_stdin = strcmp(file, "-") == 0;
 
     //try to load the file:
+    //from stdin
+    if(use_stdin)
+    {
+      strcpy(path, "<stdin>");
+      map = stdin;
+    }
     //absolute path
-    map = fopen(strcpy(path,file),"r");
+    if(!map)
+    {
+      map = fopen(strcpy(path,file),"r");
+    }
     if(!map)
     {
       map = fopen(strcat(path,".omm"),"r");
@@ -116,14 +127,23 @@ int load_map(CONVERTER* conv, char* file)
     if(conv->verbose)
         printf("Using map file %s\n",path);
 
+    //copy to temp file if reading from stdin
+    if(use_stdin && !(tmp = tmpfile()))
+    {
+        printf("Error opening temporary file!");
+        return -1;
+    }
+
     //count how many lines there are
     i=0;
     while(!feof(map))
     {
         if (!fgets(line,400,map)) break;
+	if (use_stdin) fputs(line,tmp);
         if(!is_empty(line))
             i++;//line is not commented out and not empty
     }
+    if (use_stdin) map = tmp;
 
     p = (PAIRHANDLE*)malloc(sizeof(PAIRHANDLE)*i);
     //initialize the register table (cf. pair.c) -ag
