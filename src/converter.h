@@ -20,6 +20,9 @@ typedef struct _CONVERTER
     uint16_t npairs;
     PAIRHANDLE* p;
 
+    table tab;
+    float** registers;
+
     void * seq;
 } CONVERTER;
 #endif

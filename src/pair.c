@@ -9,6 +9,13 @@
 #include<string.h>
 #include"pair.h"
 
+#include <stdbool.h>
+#include "hashtable.h"
+// Not sure what's a good magic number for the hash table size here, just
+// make it large enough so that the buckets don't grow too large.
+#define TABLESZ 4711
+
+
 
 typedef struct _PAIR
 {
@@ -89,15 +96,6 @@ typedef struct _PAIR
    in the try_match_osc() and try_match_midi() routines below (watch out for
    code labeled "-ag"). */
 
-// Not sure what's a good magic number for the hash table size here, just
-// make it large enough so that the buckets don't grow too large.
-#define TABLESZ 4711
-
-#include <stdbool.h>
-#include "hashtable.h"
-
-table tab;
-
 // element type
 struct elem
 {
@@ -140,37 +138,33 @@ int ht_hash(ht_key s, int m)
     return hx;
 }
 
-//TODO: remove globals
-float **regs;
-int n_keys;
-
-void init_regs(int n)
 // This must be called once in the main program (cf. main.c) with n == the
 // number of config lines in the map, to allocate enough storage to hold all
 // the register pointers (note that there is <=  one entry per
 // configuration pair in the table).
+void init_regs(float ***regs, int n)
 {
-    regs = (float**)calloc(n, sizeof(float*));
+    *regs = (float**)calloc(n, sizeof(float*));
 }
 
-int strkey(char* path, char* argtypes)
 // Return a key (index into the regs table) which is unique for the given
 // path, argtypes pair.
+int strkey(table *tab, char* path, char* argtypes, int* nkeys)
 {
     // According to the OSC spec, path may not contain a comma, so we can use
     // that as a delimiter for the path,argtypes key value here.
     char *key = malloc(strlen(path)+strlen(argtypes)+2);
     sprintf(key, "%s,%s", path, argtypes);
     // Make sure that the hash table is initialized.
-    if (!tab) tab = table_new(TABLESZ, ht_getkey, ht_equal, ht_hash);
-    ht_elem e = table_search(tab, key);
+    if (!*tab) *tab = table_new(TABLESZ, ht_getkey, ht_equal, ht_hash);
+    ht_elem e = table_search(*tab, key);
     if (!e)
     {
         // new key, add a new entry to the regs table
         elem el = (elem)malloc(sizeof(struct elem));
         el->key = key;
-        el->k = n_keys++;
-        table_insert(tab, el);
+        el->k = *nkeys++;
+        table_insert(*tab, el);
         e = el;
     }
     return ((elem)e)->k;
@@ -397,7 +391,7 @@ int get_pair_path(char* config, char* path, PAIR* p)
     return 0;
 }
 
-int get_pair_argtypes(char* config, char* path, PAIR* p)
+int get_pair_argtypes(char* config, char* path, PAIR* p, table* tab, float** regs, int* nkeys)
 {
     char argtypes[100];
     int i,j = 0;
@@ -421,7 +415,7 @@ int get_pair_argtypes(char* config, char* path, PAIR* p)
     p->osc_rangemax = (float*)malloc( sizeof(float) * (p->argc_in_path+len+1) );
 
     //initialize hash key and register storage -ag
-    p->key = strkey(path, argtypes);
+    p->key = strkey(tab, path, argtypes, nkeys);
     p->regs = regs[p->key];
     //allocate space for the register storage if not yet initialized
     if(!p->regs)
@@ -971,7 +965,7 @@ PAIRHANDLE abort_pair_alloc(int step, PAIR* p)
     return 0;
 }
 
-PAIRHANDLE alloc_pair(char* config)
+PAIRHANDLE alloc_pair(char* config, table* tab, float** regs, int* nkeys)
 {
     //path argtypes, arg1, arg2, ... argn : midicommand(arg1+4, arg3, 2*arg4);
     PAIR* p;
@@ -994,7 +988,7 @@ PAIRHANDLE alloc_pair(char* config)
         return abort_pair_alloc(2,p);
 
 
-    if(-1 == get_pair_argtypes(config,path,p))
+    if(-1 == get_pair_argtypes(config,path,p,tab,regs,nkeys))
         return abort_pair_alloc(3,p);
 
 

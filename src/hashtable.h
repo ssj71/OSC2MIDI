@@ -5,6 +5,7 @@
 
 #ifndef _HASHTABLE_H
 #define _HASHTABLE_H
+#include<stdbool.h>
 
 typedef void* ht_key;
 typedef void* ht_elem;

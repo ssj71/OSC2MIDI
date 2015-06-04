@@ -147,7 +147,8 @@ int load_map(CONVERTER* conv, char* file)
 
     p = (PAIRHANDLE*)malloc(sizeof(PAIRHANDLE)*i);
     //initialize the register table (cf. pair.c) -ag
-    init_regs(i);
+    init_regs(&conv->registers,i);
+    int nkeys = 0;
     rewind(map);
     i=0;
     while(!feof(map))
@@ -155,7 +156,7 @@ int load_map(CONVERTER* conv, char* file)
         if (!fgets(line,400,map)) break;
         if(!is_empty(line))
         {
-            p[i] = alloc_pair(line);
+            p[i] = alloc_pair(line, &conv->tab, conv->registers, &nkeys);
             if(p[i++])
             {
                 if(conv->verbose)
