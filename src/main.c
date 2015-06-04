@@ -39,7 +39,7 @@ int is_empty(const char *s)
 
 // This must be called  with n == the
 // number of config lines in the map, to allocate enough storage to hold all
-// the register pointers that some pairs might share (note that there is <=  
+// the register pointers that some pairs might share (note that there is <=
 // one entry per configuration pair in the table).
 void init_regs(float ***regs, int n)
 {
@@ -158,7 +158,7 @@ int load_map(CONVERTER* conv, char* file)
 
     p = (PAIRHANDLE*)malloc(sizeof(PAIRHANDLE)*i);
     //initialize the register table (cf. pair.c) -ag
-    init_regs(&conv->registers,i); 
+    init_regs(&conv->registers,i);
     conv->tab = init_table();
     int nkeys = 0;
     rewind(map);
