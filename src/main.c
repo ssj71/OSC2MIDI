@@ -14,6 +14,7 @@
 #include"oscserver.h"
 #include"converter.h"
 #include"jackdriver.h"
+#include"ht_stuff.h"
 
 uint8_t quit = 0;
 
@@ -35,6 +36,16 @@ int is_empty(const char *s)
     }
     return 1;
 }
+
+// This must be called  with n == the
+// number of config lines in the map, to allocate enough storage to hold all
+// the register pointers that some pairs might share (note that there is <=  
+// one entry per configuration pair in the table).
+void init_regs(float ***regs, int n)
+{
+    *regs = (float**)calloc(n, sizeof(float*));
+}
+
 
 int load_map(CONVERTER* conv, char* file)
 {
@@ -147,7 +158,8 @@ int load_map(CONVERTER* conv, char* file)
 
     p = (PAIRHANDLE*)malloc(sizeof(PAIRHANDLE)*i);
     //initialize the register table (cf. pair.c) -ag
-    init_regs(&conv->registers,i);
+    init_regs(&conv->registers,i); 
+    conv->tab = init_table();
     int nkeys = 0;
     rewind(map);
     i=0;
@@ -156,7 +168,7 @@ int load_map(CONVERTER* conv, char* file)
         if (!fgets(line,400,map)) break;
         if(!is_empty(line))
         {
-            p[i] = alloc_pair(line, &conv->tab, conv->registers, &nkeys);
+            p[i] = alloc_pair(line, conv->tab, conv->registers, &nkeys);
             if(p[i++])
             {
                 if(conv->verbose)
@@ -169,6 +181,7 @@ int load_map(CONVERTER* conv, char* file)
                 i--;//error message will be printed by alloc_pair
         }
     }
+    free_table(conv->tab);
     if(conv->verbose)
     {
         printf("%i pairs created.\n ",i);
