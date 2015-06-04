@@ -1412,9 +1412,8 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
     }
     else
     {
-        //anything matches a raw midi
         //let's do a quick check here to make sure that the constant parts of
-        //the MIDI message match up; is that good enough? -ag
+        //the MIDI message match up -ag
         for(i=0;i<3;i++) {
 	    if(p->midi_map[i] == -1 &&
 	       (mymsg[i] < p->midi_val[i] || mymsg[i] > p->midi_rangemax[i]))
@@ -1422,7 +1421,8 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
 	}
         for(i=0;i<p->argc;i++)
         {
-            if(p->types[i] == 'm' && p->osc_map[i] != -1)
+            place = p->osc_map[i+p->argc_in_path];
+            if(p->types[i] == 'm' && place != -1)
             {
                 m[1] = mymsg[0];
                 m[2] = mymsg[1];
@@ -1430,10 +1430,17 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
                 m[0] = 0;//port ID
                 lo_message_add_midi(oscm,m);
             }
+            else if(place != -1)
+	    {
+	        int midival = mymsg[place];
+		float val = p->osc_scale[i+p->argc_in_path]*((float)midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path];
+		//record the value for later use in reverse mapping -ag
+		p->regs[i+p->argc_in_path] = val;
+                load_osc_value( oscm,p->types[i],val );
+	    }
             else
             {
 	        //we have no idea what should be in these, so just load a previously recorded value or the defaults
-	        //XXXFIXME: shouldn't we look for parameters which are mapped to arguments of rawmidi here, like in the !raw_midi case? -ag
 	        float val = p->regs[i+p->argc_in_path];
 		float min = p->osc_val[i + p->argc_in_path],
 		    max = p->osc_rangemax[i + p->argc_in_path];
