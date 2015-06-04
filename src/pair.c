@@ -48,7 +48,8 @@ typedef struct _PAIR
     uint8_t use_glob_vel;   //flag decides if using global velocity (1) or if its specified by message (0)
     uint8_t set_velocity;   //flag if message is actually control message to change global velocity
     uint8_t set_shift;      //flag if message is actually control message to change filter shift value
-    uint8_t raw_midi;       //flag if message sends osc datatype of midi message
+    uint8_t osc_midi;       //flag if message sends osc datatype of midi message
+    uint8_t raw_midi;       //flag if message sends raw midi data
     uint8_t midi_const[4];  //flags for midi message (channel, data1, data2) is a constant (1) or range (2)
     uint8_t *osc_const;    //flags for osc args that are constant (1) or range (2)
 
@@ -546,6 +547,7 @@ int get_pair_midicommand(char* config, PAIR* p)
         p->opcode = 0x01;
         p->midi_val[0] = 0xFF;
         n = 1;
+        p->osc_midi = 1;
     }
     //non-midi commands
     else if(strstr(midicommand,"setchannel"))
@@ -985,7 +987,7 @@ PAIRHANDLE alloc_pair(char* config)
     //set defaults
     p->argc_in_path = 0;
     p->argc = 0;
-    p->raw_midi = 0;
+    p->raw_midi = p->osc_midi = 0;
     p->opcode = 0;
     p->midi_val[0] = 0;
     p->midi_val[1] = 0;
@@ -1154,11 +1156,11 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                     break;
                 case 'm'://midi
                     //send full midi message and exit
-                    if(p->raw_midi)
+                    if(p->osc_midi)
                     {
-                        msg[0] = argv[i+1]->i;
-                        msg[1] = argv[i+2]->i;
-                        msg[2] = argv[i+3]->i;
+                        msg[0] = argv[i]->m[1];
+                        msg[1] = argv[i]->m[2];
+                        msg[2] = argv[i]->m[3];
                         return 1;
                     }
 
@@ -1327,7 +1329,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
     // this copy in order to keep the original message unscathed. -ag
     uint8_t mymsg[3] = {msg[0],msg[1],msg[2]};
 
-    if(!p->raw_midi)
+    if(!p->raw_midi && !p->osc_midi)
     {
         //check the opcode
         if( (mymsg[0]&0xF0) != p->opcode )
@@ -1414,7 +1416,8 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
     {
         //let's do a quick check here to make sure that the constant parts of
         //the MIDI message match up -ag
-        for(i=0;i<3;i++) {
+        int n = p->raw_midi?3:1;
+        for(i=0;i<n;i++) {
 	    if(p->midi_map[i] == -1 &&
 	       (mymsg[i] < p->midi_val[i] || mymsg[i] > p->midi_rangemax[i]))
 	        return 0;
@@ -1625,7 +1628,7 @@ char * opcode2cmd(uint8_t opcode, uint8_t noteoff)
 void print_midi(PAIRHANDLE ph, uint8_t msg[])
 {
   PAIR* p = (PAIR*)ph;
-  if(p->raw_midi) // this needs special treatment
+  if(p->raw_midi || p->osc_midi) // these need special treatment
     printf("%s ( %i, %i, %i )", opcode2cmd(p->opcode,1), msg[0], msg[1], msg[2]);
   else
     //TODO: make this variable number of args for program change etc
