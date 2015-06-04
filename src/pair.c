@@ -1071,7 +1071,7 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
         tmp = strstr(path,p->path[i]);  
         n = strlen(p->path[i]);
         p->path[i][p->perc[i]] = '%';
-        if( !tmp )
+        if( tmp !=path )
         {
             return 0;
         }
@@ -1106,7 +1106,7 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
     if(n)
     {
         tmp = strstr(path,p->path[i]);
-        if( !tmp) //tmp !=path );
+        if( tmp !=path )
         {
             return 0;
         } 
