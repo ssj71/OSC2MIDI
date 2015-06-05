@@ -71,16 +71,16 @@ If you want to try a different mapping just run with the `-m` argument, i.e.
 
     osc2midi -m gameOfLife
 
-This will run with the mapping dictated by gameOfLife.omm in the .osc2midi
-directory. The app will check the directories as outlined above if it cannot
-find the specified file as a relative or absolute path.
+This will run with the mapping dictated by gameOfLife.omm in the first
+directory it finds it in. The app will check the directories as outlined above 
+if it cannot find the specified file as a relative or absolute path.
 
 For creating your own mappings it might be useful to use monitor mode (`-mon`)
 which only prints out the OSC messages that are received. While testing a new
 mapping it is often useful to run with verbose mode on (`-v`).
 
 If you develop a mapping that others might find useful please post it in our
-sourceforge forums so it can be included with the source.
+as an issue in github or do a pull request so it can be included with the source.
 
 Also included with this source code are some custom interfaces that can be
 loaded into the Control app for Android and iOS.
