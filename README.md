@@ -34,9 +34,9 @@ For additional details on what options are available run
 
 OSC2MIDI allows you to change the mapping between OSC and MIDI messages using
 an OSC to MIDI map file (.omm). This package has several mappings already
-installed to your home directory in the folder /usr/local/share/osc2midi/. The
-default mapping is made to work with all the default interfaces that come with
-the Control Android app. Other included mappings are:
+installed in the folder /usr/local/share/osc2midi/. The default mapping is
+made to work with all the default interfaces that come with the Control
+Android app. Other included mappings are:
 
 * touchosc - this was made to work with the proprietary Android app of the
   same name, but I don't own it so it is untested. **NOTE:** There is a
@@ -52,7 +52,7 @@ the Control Android app. Other included mappings are:
 * generic - this was made to work with generic OSC clients that send MIDI like
   messages
 
-* control - identical to the default map, made to work with the control app
+* control - identical to the default map, made to work with the Control app
 
 * gameOfLife - this mapping is a more detailed mapping for the game of life
   interface that comes default with Control. It is a bit more musical than the
@@ -67,7 +67,7 @@ which is usually located at ~/.config/osc2midi/. Mappings in this directory
 will be used first, followed by maps in /etc/osc2midi/ and finally in the
 default install location of /usr/local/share/osc2midi.
 
-If you want to try a different mapping just run with the `-m` argument. I.e.
+If you want to try a different mapping just run with the `-m` argument, i.e.
 
     osc2midi -m gameOfLife
 
