@@ -12,5 +12,5 @@
 /touch     ii,  v,c   : aftertouch( c, v );
 /bend      ii,  v,c   : pitchbend( c, v );
 /start ,              : rawmidi( 250, 0, 0 );
-/stop ,               : rawmidi( 251, 0, 0 ); 
-/cont ,               : rawmidi( 252, 0, 0 );
+/cont ,               : rawmidi( 251, 0, 0 );
+/stop ,               : rawmidi( 252, 0, 0 );
