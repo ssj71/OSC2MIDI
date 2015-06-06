@@ -276,12 +276,12 @@ int main(int argc, char** argv)
             else if(strcmp(argv[i], "-m2o") ==0)
             {
                 //monitor mode (osc messages)
-                conv.convert = 1;
+                conv.convert = -1;
             }
             else if(strcmp(argv[i], "-o2m") ==0)
             {
                 //monitor mode (osc messages)
-                conv.convert = -1;
+                conv.convert = 1;
             }
             else if (strcmp(argv[i], "-m") == 0)
             {
