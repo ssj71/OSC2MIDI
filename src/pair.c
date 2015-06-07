@@ -856,7 +856,7 @@ PAIRHANDLE alloc_pair(char* config, table tab, float** regs, int* nkeys)
     int n;
     char path[200];
 
-    p = (PAIR*)malloc(sizeof(PAIR));
+    p = (PAIR*)calloc(1, sizeof(PAIR));
 
     //set defaults
     p->argc_in_path = 0;
