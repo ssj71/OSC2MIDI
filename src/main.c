@@ -369,7 +369,9 @@ int main(int argc, char** argv)
     {
         //get address ready to send osc messages to
         seq.usein = 1;
-        loaddr = lo_address_new(addr,aport);
+	//note that addr must be NULL to indicate the default localhost here,
+	//an empty address string won't do
+        loaddr = lo_address_new(*addr?addr:NULL,aport);
         printf(" sending osc messages to address %s:%s\n",addr,aport);
     }
     else
