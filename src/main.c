@@ -191,12 +191,12 @@ int load_map(CONVERTER* conv, char* file)
     return i;
 }
 
-void useage()
+void usage()
 {
     printf("osc2midi - a linux OSC to MIDI bridge\n");
     printf("\n");
     printf("\n");
-    printf("USEAGE:\n");
+    printf("USAGE:\n");
     printf("    osc2midi [-option <value>...]\n");
     printf("\n");
     printf("OPTIONS:\n");
@@ -215,11 +215,11 @@ void useage()
     printf("    -h             show this message\n");
     printf("\n");
     printf("NOTES:\n");
-    printf("    By default it looks for mapping files relative to ~/.osc2midi/. for information\n");
-    printf("     on how to create your own mapping see default.omm in that directory\n");
-    printf("    Multi match mode is heavier: It checks all potential matches, but its useful\n");
-    printf("     if OSC messages contain more data than can be sent in a single MIDI message\n");
-    printf("     by default multi mode is on. Pass -single to disable\n");
+    printf("    By default osc2midi looks for mapping files in /usr/local/share/osc2midi/.\n");
+    printf("    See default.omm in that directory on how to create your own mappings.\n");
+    printf("    Multi mode is heavier: It finds all matches, which is useful if OSC\n");
+    printf("    messages contain more data than can be sent in a single MIDI message.\n");
+    printf("    By default multi mode is on. Pass -single to disable.\n");
     printf("\n");
 
     return;
@@ -276,12 +276,12 @@ int main(int argc, char** argv)
             else if(strcmp(argv[i], "-m2o") ==0)
             {
                 //monitor mode (osc messages)
-                conv.convert = 1;
+                conv.convert = -1;
             }
             else if(strcmp(argv[i], "-o2m") ==0)
             {
                 //monitor mode (osc messages)
-                conv.convert = -1;
+                conv.convert = 1;
             }
             else if (strcmp(argv[i], "-m") == 0)
             {
@@ -326,13 +326,13 @@ int main(int argc, char** argv)
             else if (strcmp(argv[i], "-h") == 0)
             {
                 //help
-                useage();
+                usage();
                 return -1;
             }
             else
             {
                 printf("Unknown argument! %s\n",argv[i]);
-                useage();
+                usage();
                 return -1;
             }
 
@@ -352,7 +352,7 @@ int main(int argc, char** argv)
         }
     }
     else if(conv.verbose)
-        printf("Monitor mode, incoming OSC or MIDI messages will only be printed.\n");
+        printf("Monitor mode, incoming OSC messages will only be printed.\n");
 
     //start the server
     lo_server_thread st;
@@ -369,7 +369,9 @@ int main(int argc, char** argv)
     {
         //get address ready to send osc messages to
         seq.usein = 1;
-        loaddr = lo_address_new(addr,aport);
+	//note that addr must be NULL to indicate the default localhost here,
+	//an empty address string won't do
+        loaddr = lo_address_new(*addr?addr:NULL,aport);
         printf(" sending osc messages to address %s:%s\n",addr,aport);
     }
     else

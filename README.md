@@ -40,9 +40,9 @@ Android app. Other included mappings are:
 
 * touchosc - this was made to work with the proprietary Android app of the
   same name, but I don't own it so it is untested. **NOTE:** There is a
-  "to2omm" script available at <https://bitbucket.org/agraef/to2omm> which
-  allows you to convert TouchOSC layout (.touchosc) files to OSC2MIDI map
-  (.omm) files. The script extracts the MIDI mappings contained in the
+  "to2omm" script available at <https://bitbucket.org/agraef/osc2midi-utils>
+  which allows you to convert TouchOSC layout (.touchosc) files to OSC2MIDI
+  map (.omm) files. The script extracts the MIDI mappings contained in the
   TouchOSC layout and creates a corresponding map file ready to be used with
   OSC2MIDI.
 
