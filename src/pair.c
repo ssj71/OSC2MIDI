@@ -551,111 +551,156 @@ int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc, uint8_t s
     return i;
 }
 
+static int is_ws(const char *s)
+{
+    while(*s && *s == ' ') s++;
+    return *s==0;
+}
+
+static int match_op(const char *s, char op)
+{
+    while(*s && *s == ' ') s++;
+    if (*s != op) return 0;
+    while(*++s && *s == ' ');
+    return *s==0;
+}
+
 //this function assumes scale and offset are initialized to 1 and 0 (or more appropriate numbers)
 //it will simpy add in (or multiply in) the values found here
 //it will populate the varname string so it must have memory allocated
 int get_pair_arg_conditioning(char* arg, char* varname, float* _scale, float* _offset)
 {
-    char pre[50], post[50];
+    //make sure that these are initialized properly, even if never matched
+    char pre[50] = {0}, post[50] = {0};
     uint8_t j;
     float scale = 1, offset = 0;
-    if( !(j = sscanf(arg,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,varname,post)) )
+    //This is a bit of a hack, but we use a bunch of %n's here to make sure
+    //that we don't leave any trailing random garbage in any of the sscanf
+    //calls below. Any such leftovers indicate syntax errors, unless they're
+    //nothing but whitespace, so we need to verify that. -ag
+    int end = strlen(arg);
+    if( !(j = sscanf(arg,"%[.1234567890*/+- ]%n%[^*/+- ]%n%[.1234567890*/+- ]%n",pre,&end,varname,&end,post,&end)) )
     {
-        j = sscanf(arg,"%[^*/+- ]%[.1234567890*/+- ]",varname,post);
+        j = sscanf(arg,"%[^*/+- ]%n%[.1234567890*/+- ]%n",varname,&end,post,&end);
     }
-    if(!j)
+    if(!j || !is_ws(arg+end)) //don't allow trailing garbage
     {
-        printf("\nERROR -could not parse arg!\n");
+        printf("\nERROR -could not parse arg '%s'!\n", arg);
         return -1;
     }
     //get conditioning, should be pre=b+a* and/or post=*a+b
-    if(strlen(pre))
+    if(*pre)
     {
         char s1[20],s2[20];
         float a,b;
-        switch(sscanf(pre,"%f%[-+* ]%f%[+-* ]",&b,s1,&a,s2))
+        switch(sscanf(pre,"%f%[-+* ]%n%f%n%[+-* ]%n",&b,s1,&end,&a,&end,s2,&end))
         {
         case 4:
-            if(strchr(s2,'*'))//only multiply makes sense here
+            if(match_op(s2,'*'))//only multiply makes sense here
             {
                 scale *= a;
             }
             else
             {
-                printf("\nERROR -could not get pre conditioning! nonsensical operator?\n");
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", pre);
                 return -1;
             }
         case 3:
-        //if its not whitespace, its nonsensical, we'll ignore it
+        //if its not whitespace, its nonsensical, will be caught below
         case 2:
-            if(strchr(s1,'*'))
+            if (!is_ws(pre+end)) //don't allow trailing garbage
+            {
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", pre);
+                return -1;
+            }
+            if(match_op(s1,'*'))
             {
                 scale *= b;
             }
-            else if(strchr(s1,'+'))
+            else if(match_op(s1,'+'))
             {
                 offset += b;
             }
-            else if(strchr(s1,'-'))
+            else if(match_op(s1,'-'))
             {
                 offset += b;
-                scale *= -1;
-            }
-            break;
-        default:
-            if(strchr(pre,'-'))
-            {
                 scale *= -1;
             }
             else
             {
-                //if its not whitespace, its nonsensical, we'll ignore it
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", pre);
+                return -1;
+            }
+            break;
+        default:
+            if(match_op(pre,'-'))
+            {
+                scale *= -1;
+            }
+            else if (!is_ws(pre))
+            {
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", pre);
+                return -1;
             }
             break;
         }//switch
     }//if pre conditions
-    if(strlen(post))
+    if(*post)
     {
         char s1[20],s2[20];
         float a,b;
-        switch(sscanf(post,"%[-+*/ ]%f%[+- ]%f",s1,&a,s2,&b))
+        switch(sscanf(post,"%[-+*/ ]%f%n%[+- ]%n%f%n",s1,&a,&end,s2,&end,&b,&end))
         {
         case 4:
-            if(strchr(s2,'+'))//only add/subtract makes sense here
+            if(match_op(s2,'+'))//only add/subtract makes sense here
             {
                 offset += b;
             }
-            else if(strchr(s2,'-'))
+            else if(match_op(s2,'-'))
             {
                 offset -= b;
             }
             else
             {
-                printf("\nERROR -could not get post conditioning! nonsensical operator?\n");
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", post);
                 return -1;
             }
         case 3:
-        //if its not whitespace, its nonsensical, we'll ignore it
+        //if its not whitespace, its nonsensical, will be caught below
         case 2:
-            if(strchr(s1,'*'))
+            if (!is_ws(post+end)) //don't allow trailing garbage
+            {
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", post);
+                return -1;
+            }
+            if(match_op(s1,'*'))
             {
                 scale *= a;
             }
-            else if(strchr(s1,'/'))
+            else if(match_op(s1,'/'))
             {
                 scale /= a;
             }
-            else if(strchr(s1,'+'))
+            else if(match_op(s1,'+'))
             {
                 offset += a;
             }
-            else if(strchr(s1,'-'))
+            else if(match_op(s1,'-'))
             {
                 offset -= a;
             }
+            else
+            {
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", post);
+                return -1;
+            }
             break;
         default:
-            //if its not whitespace, its nonsensical, we'll ignore it
+            if (!is_ws(post))
+            {
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", post);
+                return -1;
+            }
             break;
         }//switch
 
@@ -743,30 +788,30 @@ int get_pair_mapping(char* config, PAIR* p, int n)
         }
         else if(!strcmp(var,"channel"))//check if its the global channel keyword
         {
-	    if (i != 0)
-	    {
-		printf("\nERROR in config line:\n%s -special channel variable used in wrong position (arg %i) in midi command\n\n",config,i);
-		return -1;
-	    }
-	    if (p->midi_scale[i] != 1.0 || p->midi_offset[i] != 0.0)
-	    {
-		printf("\nERROR in config line:\n%s -scaling of special channel variable not supported\n\n",config);
-		return -1;
-	    }
+            if (i != 0)
+            {
+                printf("\nERROR in config line:\n%s -special channel variable used in wrong position (arg %i) in midi command\n\n",config,i);
+                return -1;
+            }
+            if (p->midi_scale[i] != 1.0 || p->midi_offset[i] != 0.0)
+            {
+                printf("\nERROR in config line:\n%s -scaling of special channel variable not supported\n\n",config);
+                return -1;
+            }
             p->use_glob_chan = 1;//should these global vars be able to be scaled?
         }
         else if(!strcmp(var,"velocity"))
         {
-	    if (i != 2)
-	    {
-		printf("\nERROR in config line:\n%s -special velocity variable used in wrong position (arg %i) in midi command\n\n",config,i);
-		return -1;
-	    }
-	    if (p->midi_scale[i] != 1.0 || p->midi_offset[i] != 0.0)
-	    {
-		printf("\nERROR in config line:\n%s -scaling of special velocity variable not supported\n\n",config);
-		return -1;
-	    }
+            if (i != 2)
+            {
+                printf("\nERROR in config line:\n%s -special velocity variable used in wrong position (arg %i) in midi command\n\n",config,i);
+                return -1;
+            }
+            if (p->midi_scale[i] != 1.0 || p->midi_offset[i] != 0.0)
+            {
+                printf("\nERROR in config line:\n%s -scaling of special velocity variable not supported\n\n",config);
+                return -1;
+            }
             p->use_glob_vel = 1;
         }
         else
