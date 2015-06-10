@@ -854,7 +854,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
                 p->osc_rangemax[i] = 0;
                 p->osc_const[i] = 0;
             }
-	    break;
+            break;
         }
         p->osc_val[i] = 0;
         p->osc_scale[i] = 1;
@@ -1610,9 +1610,17 @@ char * opcode2cmd(uint8_t opcode, uint8_t noteoff)
 void print_midi(PAIRHANDLE ph, uint8_t msg[])
 {
     PAIR* p = (PAIR*)ph;
+    int status = msg[0]&0xf0;
     if(p->raw_midi) // this needs special treatment
         printf("%s ( %i, %i, %i )", opcode2cmd(p->opcode,1), msg[0], msg[1], msg[2]);
+    else if (status == 0xc0 || status == 0xd0)
+    {
+        // single data byte
+        printf("%s ( %i, %i )", opcode2cmd(msg[0],1), msg[0]&0x0F, msg[1]);
+    }
     else
-        //TODO: make this variable number of args for program change etc
+    {
+        // anything else should have two data bytes
         printf("%s ( %i, %i, %i )", opcode2cmd(msg[0],1), msg[0]&0x0F, msg[1], msg[2]);
+    }
 }
