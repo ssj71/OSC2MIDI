@@ -105,16 +105,16 @@ void print_pair(PAIRHANDLE ph)
         if(i==p->argc+p->argc_in_path)
             printf("off");
     }
-    printf("(");
+    printf("( ");
 
     //global channel
     if(p->use_glob_chan)
-        printf(" channel");
+        printf("channel");
     //midi arg 0
     else if(p->midi_const[0] == 2)
-        printf(" %i-%i",p->midi_val[0], p->midi_rangemax[0]);
+        printf("%i-%i",p->midi_val[0], p->midi_rangemax[0]);
     else if(p->midi_const[0] == 1)
-        printf(" %i",p->midi_val[0]);
+        printf("%i",p->midi_val[0]);
     else
     {
         if(p->midi_map[0] != -1)
@@ -126,7 +126,7 @@ void print_pair(PAIRHANDLE ph)
                 printf(" + %.2f",p->midi_offset[0]);
         }
         else if(p->n>0)
-            printf(", y1");
+            printf("y1");
     }
 
     //midi arg1
