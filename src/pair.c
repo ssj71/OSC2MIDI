@@ -7,6 +7,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<ctype.h>
 #include"pair.h"
 
 #include "ht_stuff.h"
@@ -105,16 +106,16 @@ void print_pair(PAIRHANDLE ph)
         if(i==p->argc+p->argc_in_path)
             printf("off");
     }
-    printf("(");
+    printf("( ");
 
     //global channel
     if(p->use_glob_chan)
-        printf(" channel");
+        printf("channel");
     //midi arg 0
     else if(p->midi_const[0] == 2)
-        printf(" %i-%i",p->midi_val[0], p->midi_rangemax[0]);
+        printf("%i-%i",p->midi_val[0], p->midi_rangemax[0]);
     else if(p->midi_const[0] == 1)
-        printf(" %i",p->midi_val[0]);
+        printf("%i",p->midi_val[0]);
     else
     {
         if(p->midi_map[0] != -1)
@@ -126,7 +127,7 @@ void print_pair(PAIRHANDLE ph)
                 printf(" + %.2f",p->midi_offset[0]);
         }
         else if(p->n>0)
-            printf(", y1");
+            printf("y1");
     }
 
     //midi arg1
@@ -551,111 +552,166 @@ int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc, uint8_t s
     return i;
 }
 
+//check whether the given string contains nothing but whitespace
+static int is_ws(const char *s)
+{
+    while(*s && isspace(*s)) s++;
+    return *s==0;
+}
+
+//match the given string against a given operator symbol
+//checks that the string contains nothing but the operator symbol,
+//possibly surrounded by whitespace
+static int match_op(const char *s, char op)
+{
+    while(*s && isspace(*s)) s++;
+    if (*s != op) return 0;
+    while(*++s && isspace(*s));
+    return *s==0;
+}
+
 //this function assumes scale and offset are initialized to 1 and 0 (or more appropriate numbers)
 //it will simpy add in (or multiply in) the values found here
 //it will populate the varname string so it must have memory allocated
 int get_pair_arg_conditioning(char* arg, char* varname, float* _scale, float* _offset)
 {
-    char pre[50], post[50];
+    //make sure that these are initialized properly, even if never matched
+    char pre[50] = {0}, post[50] = {0};
     uint8_t j;
     float scale = 1, offset = 0;
-    if( !(j = sscanf(arg,"%[.1234567890*/+- ]%[^*/+- ]%[.1234567890*/+- ]",pre,varname,post)) )
+    //This is a bit of a hack, but we use a bunch of %n's here to make sure
+    //that we don't leave any trailing random garbage in any of the sscanf
+    //calls below. Any such leftovers indicate syntax errors, unless they're
+    //nothing but whitespace, so we need to verify that. -ag
+    int end = strlen(arg);
+    if( !(j = sscanf(arg,"%[.1234567890*/+- ]%n%[^*/+- ]%n%[.1234567890*/+- ]%n",pre,&end,varname,&end,post,&end)) )
     {
-        j = sscanf(arg,"%[^*/+- ]%[.1234567890*/+- ]",varname,post);
+        j = sscanf(arg,"%[^*/+- ]%n%[.1234567890*/+- ]%n",varname,&end,post,&end);
     }
-    if(!j)
+    if(!j || !is_ws(arg+end)) //don't allow trailing garbage
     {
-        printf("\nERROR -could not parse arg!\n");
+        printf("\nERROR -could not parse arg '%s'!\n", arg);
         return -1;
     }
     //get conditioning, should be pre=b+a* and/or post=*a+b
-    if(strlen(pre))
+    if(*pre)
     {
         char s1[20],s2[20];
         float a,b;
-        switch(sscanf(pre,"%f%[-+* ]%f%[+-* ]",&b,s1,&a,s2))
+        switch(sscanf(pre,"%f%[-+* ]%n%f%n%[+-* ]%n",&b,s1,&end,&a,&end,s2,&end))
         {
         case 4:
-            if(strchr(s2,'*'))//only multiply makes sense here
+            if(match_op(s2,'*'))//only multiply makes sense here
             {
                 scale *= a;
             }
             else
             {
-                printf("\nERROR -could not get pre conditioning! nonsensical operator?\n");
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", pre);
                 return -1;
             }
         case 3:
-        //if its not whitespace, its nonsensical, we'll ignore it
+        //if its not whitespace, its nonsensical, will be caught below
         case 2:
-            if(strchr(s1,'*'))
+            if (!is_ws(pre+end)) //don't allow trailing garbage
+            {
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", pre);
+                return -1;
+            }
+            if(match_op(s1,'*'))
             {
                 scale *= b;
             }
-            else if(strchr(s1,'+'))
+            else if(match_op(s1,'+'))
             {
                 offset += b;
             }
-            else if(strchr(s1,'-'))
+            else if(match_op(s1,'-'))
             {
                 offset += b;
-                scale *= -1;
-            }
-            break;
-        default:
-            if(strchr(pre,'-'))
-            {
                 scale *= -1;
             }
             else
             {
-                //if its not whitespace, its nonsensical, we'll ignore it
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", pre);
+                return -1;
+            }
+            break;
+        default:
+            if(match_op(pre,'-'))
+            {
+                scale *= -1;
+            }
+            //if we come here, we failed to parse the pre conditioning; if
+            //it's just whitespace then we ignore it, otherwise there's a
+            //syntax error, so spit out an error message
+            else if (!is_ws(pre))
+            {
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", pre);
+                return -1;
             }
             break;
         }//switch
     }//if pre conditions
-    if(strlen(post))
+    if(*post)
     {
         char s1[20],s2[20];
         float a,b;
-        switch(sscanf(post,"%[-+*/ ]%f%[+- ]%f",s1,&a,s2,&b))
+        switch(sscanf(post,"%[-+*/ ]%f%n%[+- ]%n%f%n",s1,&a,&end,s2,&end,&b,&end))
         {
         case 4:
-            if(strchr(s2,'+'))//only add/subtract makes sense here
+            if(match_op(s2,'+'))//only add/subtract makes sense here
             {
                 offset += b;
             }
-            else if(strchr(s2,'-'))
+            else if(match_op(s2,'-'))
             {
                 offset -= b;
             }
             else
             {
-                printf("\nERROR -could not get post conditioning! nonsensical operator?\n");
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", post);
                 return -1;
             }
         case 3:
-        //if its not whitespace, its nonsensical, we'll ignore it
+        //if its not whitespace, its nonsensical, will be caught below
         case 2:
-            if(strchr(s1,'*'))
+            if (!is_ws(post+end)) //don't allow trailing garbage
+            {
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", post);
+                return -1;
+            }
+            if(match_op(s1,'*'))
             {
                 scale *= a;
             }
-            else if(strchr(s1,'/'))
+            else if(match_op(s1,'/'))
             {
                 scale /= a;
             }
-            else if(strchr(s1,'+'))
+            else if(match_op(s1,'+'))
             {
                 offset += a;
             }
-            else if(strchr(s1,'-'))
+            else if(match_op(s1,'-'))
             {
                 offset -= a;
             }
+            else
+            {
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", post);
+                return -1;
+            }
             break;
         default:
-            //if its not whitespace, its nonsensical, we'll ignore it
+            //if we come here, we failed to parse the post conditioning; if
+            //it's just whitespace then we ignore it, otherwise there's a
+            //syntax error, so spit out an error message
+            if (!is_ws(post))
+            {
+                printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", post);
+                return -1;
+            }
             break;
         }//switch
 
@@ -741,12 +797,32 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             printf("\nERROR in config line:\n%s -could not understand arg %i in midi command\n\n",config,i);
             return -1;
         }
-        else if(!strncmp(var,"channel",7))//check if its the global channel keyword
+        else if(!strcmp(var,"channel"))//check if its the global channel keyword
         {
+            if (i != 0)
+            {
+                printf("\nERROR in config line:\n%s -special channel variable used in wrong position (arg %i) in midi command\n\n",config,i);
+                return -1;
+            }
+            if (p->midi_scale[i] != 1.0 || p->midi_offset[i] != 0.0)
+            {
+                printf("\nERROR in config line:\n%s -scaling of special channel variable not supported\n\n",config);
+                return -1;
+            }
             p->use_glob_chan = 1;//should these global vars be able to be scaled?
         }
-        else if(!strncmp(var,"velocity",8))
+        else if(!strcmp(var,"velocity"))
         {
+            if (i != 2)
+            {
+                printf("\nERROR in config line:\n%s -special velocity variable used in wrong position (arg %i) in midi command\n\n",config,i);
+                return -1;
+            }
+            if (p->midi_scale[i] != 1.0 || p->midi_offset[i] != 0.0)
+            {
+                printf("\nERROR in config line:\n%s -scaling of special velocity variable not supported\n\n",config);
+                return -1;
+            }
             p->use_glob_vel = 1;
         }
         else
@@ -775,9 +851,22 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     }
 
     //now go through OSC args
-    tmp = argnames;
+    tmp = strtok(argnames,",");
     for(i=0; i<p->argc_in_path + p->argc; i++)
     {
+        if(!tmp)
+        {
+            //underspecified, assume everything else is unused
+            for(; i<p->argc_in_path + p->argc; i++)
+            {
+                p->osc_val[i] = 0;
+                p->osc_scale[i] = 1;
+                p->osc_offset[i] = 0;
+                p->osc_rangemax[i] = 0;
+                p->osc_const[i] = 0;
+            }
+            break;
+        }
         p->osc_val[i] = 0;
         p->osc_scale[i] = 1;
         p->osc_offset[i] = 0;
@@ -803,21 +892,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             p->osc_const[i] = get_pair_arg_constant(tmp,&p->osc_val[i],&p->osc_rangemax[i]);
         }
         //next arg name
-        tmp = strchr(tmp,',');
-        if(!tmp)
-        {
-            //underspecified, assume everything else is unused
-            for(; i<p->argc_in_path + p->argc; i++)
-            {
-                p->osc_val[i] = 0;
-                p->osc_scale[i] = 1;
-                p->osc_offset[i] = 0;
-                p->osc_rangemax[i] = 0;
-                p->osc_const[i] = 0;
-            }
-        }
-
-        tmp++;//go to char after ','
+        tmp = strtok(NULL,",");
     }
     return 0;
 }
@@ -922,16 +997,27 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
 
 
     //set defaults / static data
-    msg[0] = p->opcode + p->midi_val[0];
-    msg[1] = p->midi_val[1];
-    msg[2] = p->midi_val[2];
-    if(p->use_glob_chan)
+    msg[0] = p->opcode;
+    if (p->set_channel || p->set_velocity || p->set_shift)
     {
-        msg[0] += *glob_chan;
+        // Special calls to set channel, velocity etc.
+        msg[1] = p->midi_val[0];
+        msg[2] = 0;
     }
-    if(p->use_glob_vel)
+    else
     {
-        msg[2] += *glob_vel;
+        // Regular call which generates a MIDI message.
+        msg[0] += p->midi_val[0];
+        msg[1] = p->midi_val[1];
+        msg[2] = p->midi_val[2];
+        if(p->use_glob_chan)
+        {
+            msg[0] += *glob_chan;
+        }
+        if(p->use_glob_vel)
+        {
+            msg[2] += *glob_vel;
+        }
     }
 
     //now start trying to get the data
@@ -961,10 +1047,27 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
         if(place != -1)
         {
             conditioned = p->midi_scale[place]*(v - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place];
-            msg[place] += ((uint8_t)conditioned)&0x7F;
-            if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+            //same code as below for arguments to set global channel etc.
+            //assert place==0 here
+            if(p->set_channel)
             {
-                msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                msg[place+1] = ((uint8_t)conditioned)&0x7F;
+            }
+            else if(p->set_velocity)
+            {
+                msg[place+1] = ((uint8_t)conditioned)&0x7F;
+            }
+            else if(p->set_shift)
+            {
+                msg[place+1] = ((uint8_t)conditioned);
+            }
+            else
+            {
+                msg[place] += ((uint8_t)conditioned)&0x7F;
+                if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+                {
+                    msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                }
             }
         }
         //check if it matches range or constant
@@ -976,20 +1079,16 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
         //record the value for later use in reverse mapping (MIDI->OSC) -ag
         p->regs[i] = v;
         path += n;
+        //skip over the parameter value
+        char *end;
+        (void) strtol(path, &end, 0);
+        // assert result==v && end != NULL
+        path = end;
     }
     //compare the end of the path
-    n = strlen(p->path[i]);
-    if(n)
+    if(strcmp(path,p->path[i]))
     {
-        tmp = strstr(path,p->path[i]);
-        if( tmp !=path )
-        {
-            return 0;
-        }
-        if(strcmp(tmp,p->path[i]))
-        {
-            return 0;
-        }
+        return 0;
     }
 
     //now the actual osc args
@@ -1030,13 +1129,17 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                 val = 1.0;
                 break;
             case 'm'://midi
-                //send full midi message and exit
                 if(p->raw_midi && p->n==1)
                 {
+                    //send full midi message
                     msg[0] = argv[i]->m[1];
                     msg[1] = argv[i]->m[2];
                     msg[2] = argv[i]->m[3];
-                    return 1;
+                    /* At this point, we're already done constructing the MIDI
+                       message, but we still need to carry on checking all the
+                       remaining arguments, to make sure that the OSC message
+                       matches. -ag */
+                    continue;
                 }
 
             case 's'://string
@@ -1049,27 +1152,21 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
 
             }
             conditioned = p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place];
-            //check if this is a message to set global channel
+            //check if this is a message to set global channel etc.
             if(p->set_channel)
             {
                 msg[place+1] = ((uint8_t)conditioned)&0x7F;
-                *glob_chan = msg[place+1];
-                return -1;//not an error but don't need to send a midi message (ret 0 for error)
             }
             else if(p->set_velocity)
             {
                 msg[place+1] = ((uint8_t)conditioned)&0x7F;
-                *glob_vel = msg[place+1];
-                return -1;
             }
             else if(p->set_shift)
             {
                 msg[place+1] = ((uint8_t)conditioned);
-                *filter = conditioned;
-                return -1;
             }
             //put it in the midi message
-            if(place == 3)//only used for note on or off
+            else if(place == 3)//only used for note on or off
             {
                 msg[0] += ((uint8_t)(conditioned>0))<<4;
             }
@@ -1129,6 +1226,24 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
             p->regs[i+p->argc_in_path] = val;
         }
     }//for args
+    // Handle setchannel et al. Note that the return value -1 doesn't indicate
+    // an error, but that we don't need to send a midi message (ret 0 denotes
+    // error).
+    if(p->set_channel)
+    {
+        *glob_chan = msg[1];
+        return -1;
+    }
+    else if(p->set_velocity)
+    {
+        *glob_vel = msg[1];
+        return -1;
+    }
+    else if(p->set_shift)
+    {
+        *filter = msg[1];
+        return -1;
+    }
     return 1;
 }
 
@@ -1506,9 +1621,17 @@ char * opcode2cmd(uint8_t opcode, uint8_t noteoff)
 void print_midi(PAIRHANDLE ph, uint8_t msg[])
 {
     PAIR* p = (PAIR*)ph;
+    int status = msg[0]&0xf0;
     if(p->raw_midi) // this needs special treatment
         printf("%s ( %i, %i, %i )", opcode2cmd(p->opcode,1), msg[0], msg[1], msg[2]);
+    else if (status == 0xc0 || status == 0xd0)
+    {
+        // single data byte
+        printf("%s ( %i, %i )", opcode2cmd(msg[0],1), msg[0]&0x0F, msg[1]);
+    }
     else
-        //TODO: make this variable number of args for program change etc
+    {
+        // anything else should have two data bytes
         printf("%s ( %i, %i, %i )", opcode2cmd(msg[0],1), msg[0]&0x0F, msg[1], msg[2]);
+    }
 }
