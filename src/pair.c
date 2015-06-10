@@ -7,6 +7,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<ctype.h>
 #include"pair.h"
 
 #include "ht_stuff.h"
@@ -551,17 +552,21 @@ int get_pair_osc_arg_index(char* varname, char* oscargs, uint8_t argc, uint8_t s
     return i;
 }
 
+//check whether the given string contains nothing but whitespace
 static int is_ws(const char *s)
 {
-    while(*s && *s == ' ') s++;
+    while(*s && isspace(*s)) s++;
     return *s==0;
 }
 
+//match the given string against a given operator symbol
+//checks that the string contains nothing but the operator symbol,
+//possibly surrounded by whitespace
 static int match_op(const char *s, char op)
 {
-    while(*s && *s == ' ') s++;
+    while(*s && isspace(*s)) s++;
     if (*s != op) return 0;
-    while(*++s && *s == ' ');
+    while(*++s && isspace(*s));
     return *s==0;
 }
 
@@ -637,6 +642,9 @@ int get_pair_arg_conditioning(char* arg, char* varname, float* _scale, float* _o
             {
                 scale *= -1;
             }
+            //if we come here, we failed to parse the pre conditioning; if
+            //it's just whitespace then we ignore it, otherwise there's a
+            //syntax error, so spit out an error message
             else if (!is_ws(pre))
             {
                 printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", pre);
@@ -696,6 +704,9 @@ int get_pair_arg_conditioning(char* arg, char* varname, float* _scale, float* _o
             }
             break;
         default:
+            //if we come here, we failed to parse the post conditioning; if
+            //it's just whitespace then we ignore it, otherwise there's a
+            //syntax error, so spit out an error message
             if (!is_ws(post))
             {
                 printf("\nERROR -failed to parse '%s'! nonsensical operator?\n", post);
