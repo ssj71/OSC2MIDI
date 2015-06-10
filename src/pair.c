@@ -741,12 +741,32 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             printf("\nERROR in config line:\n%s -could not understand arg %i in midi command\n\n",config,i);
             return -1;
         }
-        else if(!strncmp(var,"channel",7))//check if its the global channel keyword
+        else if(!strcmp(var,"channel"))//check if its the global channel keyword
         {
+	    if (i != 0)
+	    {
+		printf("\nERROR in config line:\n%s -special channel variable used in wrong position (arg %i) in midi command\n\n",config,i);
+		return -1;
+	    }
+	    if (p->midi_scale[i] != 1.0 || p->midi_offset[i] != 0.0)
+	    {
+		printf("\nERROR in config line:\n%s -scaling of special channel variable not supported\n\n",config);
+		return -1;
+	    }
             p->use_glob_chan = 1;//should these global vars be able to be scaled?
         }
-        else if(!strncmp(var,"velocity",8))
+        else if(!strcmp(var,"velocity"))
         {
+	    if (i != 2)
+	    {
+		printf("\nERROR in config line:\n%s -special velocity variable used in wrong position (arg %i) in midi command\n\n",config,i);
+		return -1;
+	    }
+	    if (p->midi_scale[i] != 1.0 || p->midi_offset[i] != 0.0)
+	    {
+		printf("\nERROR in config line:\n%s -scaling of special velocity variable not supported\n\n",config);
+		return -1;
+	    }
             p->use_glob_vel = 1;
         }
         else
