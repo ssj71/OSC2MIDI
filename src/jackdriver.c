@@ -454,30 +454,44 @@ void queue_midi(void* seqq, uint8_t msg[])
     // At least with JackOSX, Jack will transmit the bytes verbatim, so make
     // sure that we look at the status byte and trim the message accordingly,
     // in order not to transmit any invalid MIDI data.
-    switch (msg[0] & 0xf0) {
-    case 0x80: case 0x90: case 0xa0: case 0xb0: case 0xe0:
-      break; // 2 data bytes
-    case 0xc0: case 0xd0:
-      ev.len = 2; // 1 data byte
-      break;
+    switch (msg[0] & 0xf0)
+    {
+    case 0x80:
+    case 0x90:
+    case 0xa0:
+    case 0xb0:
+    case 0xe0:
+        break; // 2 data bytes
+    case 0xc0:
+    case 0xd0:
+        ev.len = 2; // 1 data byte
+        break;
     case 0xf0: // system message
-      switch (msg[0]) {
-      case 0xf2:
-	break; // 2 data bytes
-      case 0xf1: case 0xf3:
-	ev.len = 2; // 1 data byte
-      case 0xf6: case 0xf8: case 0xf9:
-      case 0xfa: case 0xfb: case 0xfc:
-      case 0xfe: case 0xff:
-	ev.len = 1; // no data byte
-	break;
-      default:
-	// ignore unknown (most likely sysex)
-	return;
-      }
-      break;
+        switch (msg[0])
+        {
+        case 0xf2:
+            break; // 2 data bytes
+        case 0xf1:
+        case 0xf3:
+            ev.len = 2; // 1 data byte
+            break;
+        case 0xf6:
+        case 0xf8:
+        case 0xf9:
+        case 0xfa:
+        case 0xfb:
+        case 0xfc:
+        case 0xfe:
+        case 0xff:
+            ev.len = 1; // no data byte
+            break;
+        default:
+            // ignore unknown (most likely sysex)
+            return;
+        }
+        break;
     default:
-      return; // not a valid MIDI message, bail out
+        return; // not a valid MIDI message, bail out
     }
 
     ev.data[0] = msg[0];
