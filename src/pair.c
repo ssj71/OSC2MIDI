@@ -840,9 +840,22 @@ int get_pair_mapping(char* config, PAIR* p, int n)
     }
 
     //now go through OSC args
-    tmp = argnames;
+    tmp = strtok(argnames,",");
     for(i=0; i<p->argc_in_path + p->argc; i++)
     {
+        if(!tmp)
+        {
+            //underspecified, assume everything else is unused
+            for(; i<p->argc_in_path + p->argc; i++)
+            {
+                p->osc_val[i] = 0;
+                p->osc_scale[i] = 1;
+                p->osc_offset[i] = 0;
+                p->osc_rangemax[i] = 0;
+                p->osc_const[i] = 0;
+            }
+	    break;
+        }
         p->osc_val[i] = 0;
         p->osc_scale[i] = 1;
         p->osc_offset[i] = 0;
@@ -868,21 +881,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             p->osc_const[i] = get_pair_arg_constant(tmp,&p->osc_val[i],&p->osc_rangemax[i]);
         }
         //next arg name
-        tmp = strchr(tmp,',');
-        if(!tmp)
-        {
-            //underspecified, assume everything else is unused
-            for(; i<p->argc_in_path + p->argc; i++)
-            {
-                p->osc_val[i] = 0;
-                p->osc_scale[i] = 1;
-                p->osc_offset[i] = 0;
-                p->osc_rangemax[i] = 0;
-                p->osc_const[i] = 0;
-            }
-        }
-
-        tmp++;//go to char after ','
+        tmp = strtok(NULL,",");
     }
     return 0;
 }
