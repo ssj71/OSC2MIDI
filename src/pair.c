@@ -217,6 +217,52 @@ void rm_whitespace(char* str)
     }
 }
 
+//do a quick syntax check of a config line
+#define error_exit(s) { msg = s; goto errout; }
+int check_config(char* config)
+{
+    char *s = config, *msg = 0;
+
+    while (isspace(*s)) s++;
+    // OSC path
+    if (!*s) error_exit("missing osc path");
+    while (*s && !isspace(*s)) s++;
+    // OSC type string is optional
+    while (*s && *s!=',' && *s!=':') s++;
+    if (*s != ',') error_exit("missing ','");
+    s++;
+    // OSC arguments are optional
+    while (*s && *s!=':') s++;
+    if (*s != ':') error_exit("missing ':'");
+    s++;
+    while (isspace(*s)) s++;
+    // MIDI command name
+    if (!*s || *s=='(') error_exit("missing midi command");
+    while (*s && *s!='(') s++;
+    // MIDI command arguments
+    if (*s != '(') error_exit("missing '('");
+    s++;
+    while (isspace(*s)) s++;
+    if (!*s || *s==')') error_exit("missing midi arguments");
+    while (*s && *s!=')') s++;
+    if (*s != ')') error_exit("missing ')'");
+    s++;
+    // Check the line end (everything that comes after the rule). We allow a
+    // trailing semicolon, end-of-line comment and whitespace there, flag
+    // everything else as an error.
+    while (isspace(*s) || *s==';') s++;
+    if (*s && *s != '#') error_exit("extra text at end of line");
+
+errout:
+    if (msg)
+    {
+        printf("\nERROR in config line:\n%s -syntax error: %s\n\n",config,msg);
+        return -1;
+    }
+    else
+        return 0;
+}
+
 int get_pair_path(char* config, char* path, PAIR* p)
 {
     char* tmp,*prev;
@@ -930,6 +976,11 @@ PAIRHANDLE alloc_pair(char* config, table tab, float** regs, int* nkeys)
     PAIR* p;
     int n;
     char path[200];
+
+    //for cosmetic purposes, add a line end if necessary (no newline at eof)
+    if (!strchr(config, '\n')) strcat(config, "\n");
+    //do a quick syntax check
+    if(-1 == check_config(config)) return 0;
 
     p = (PAIR*)calloc(1, sizeof(PAIR));
 
