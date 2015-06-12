@@ -240,9 +240,9 @@ void rm_whitespace(char* str)
 
    arg ::= [ pre ] var [ post ] | number
 
-   pre ::= '-' | [ number addop ] [ number '*' ]
+   pre ::= '-' | [ number add-op ] [ number '*' ]
 
-   post ::= [ mulop number ] [ addop number ]
+   post ::= [ mul-op number ] [ add-op number ]
 
    add-op ::= '+' | '-'
 
