@@ -226,19 +226,15 @@ void rm_whitespace(char* str)
 
    We parse the following syntax (in EBNF):
 
-   rule ::= path argtypes ',' oscarglist ':' command '(' midiarglist ')'
+   rule ::= path argtypes ',' [ arglist ] ':' command '(' arglist ')'
 
    path ::= OSC path string, must be non-empty
 
    argtypes ::= OSC type string, may be empty
 
-   oscarglist ::= [ [ oscarg ] { ',' [ oscarg ] } ]
+   arglist ::= [ arg ] { ',' [ arg ] }
 
-   oscarg ::= [ pre ] var [ post ] | number | number '-' number
-
-   arglist ::= arg { ',' arg }
-
-   arg ::= [ pre ] var [ post ] | number
+   arg ::= [ pre ] var [ post ] | number | number '-' number
 
    pre ::= '-' | [ number add-op ] [ number '*' ]
 
@@ -260,9 +256,6 @@ void rm_whitespace(char* str)
 
    In contrast, the parser is fairly picky about the argtypes string and only
    allows valid OSC type symbols there.
-
-   An empty arglist, empty arguments and ranges are permitted on the left-hand
-   side, but not on the right-hand side of a mapping rule.
 
    In order to provide good error-checking, the parser is also picky about the
    end of the line (anything which comes after the mapping rule). We only
@@ -310,9 +303,7 @@ char* check_arg(char* s, char delim, char **msg)
                     char op2 = *s;
                     if (op == '-' && (op2 == ',' || op2 == delim))
                     {
-                        // a range, this is only permitted on the lhs of a rule
-                        if (delim != ':')
-                            error_exit(*msg, "range is not allowed here");
+                        // a range
                         return s;
                     }
                     if (op2 != '*')
@@ -403,10 +394,8 @@ int check_config(char* config)
     if (!*s || *s==')') error_exit(msg, "expected midi arguments");
     while (*s && *s!=')')
     {
-        char *t = s;
         s = check_arg(s, ')', &msg);
         error_check(msg);
-        if (t == s) error_exit(msg, "expected midi argument");
         if (!*s || *s == ')') break;
         if (*s != ',') error_exit(msg, "expected ',' or ')'");
         s++;
