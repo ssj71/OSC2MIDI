@@ -141,7 +141,7 @@ int load_map(CONVERTER* conv, char* file)
     //copy to temp file if reading from stdin
     if(use_stdin && !(tmp = tmpfile()))
     {
-        printf("Error opening temporary file!");
+        printf("Error opening temporary file!\n");
         return -1;
     }
 
@@ -178,13 +178,16 @@ int load_map(CONVERTER* conv, char* file)
                 }
             }
             else
+            {
+                conv->errors++;
                 i--;//error message will be printed by alloc_pair
+            }
         }
     }
     free_table(conv->tab);
     if(conv->verbose)
     {
-        printf("%i pairs created.\n ",i);
+        printf("%i pairs created.\n",i);
     }
     conv->npairs = i;
     conv->p = p;
@@ -212,6 +215,7 @@ void usage()
     printf("    -mon           only print OSC messages that come into the port\n");
     printf("    -o2m           only convert OSC messages to MIDI\n");
     printf("    -m2o           only convert MIDI messages to OSC\n");
+    printf("    -n             dry run: check syntax of map file and exit\n");
     printf("    -h             show this message\n");
     printf("\n");
     printf("NOTES:\n");
@@ -239,6 +243,8 @@ int main(int argc, char** argv)
     strcpy(addr,"");
     strcpy(aport,"8000");
     conv.verbose = 0;
+    conv.dry_run = 0;
+    conv.errors = 0;
     conv.mon_mode = 0;
     conv.multi_match = 1;
     conv.glob_chan = 0;
@@ -287,6 +293,11 @@ int main(int argc, char** argv)
             {
                 //load map file
                 strcpy(file,argv[++i]);
+            }
+            else if (strcmp(argv[i], "-n") == 0)
+            {
+                //dry run (only check syntax and exit with error code)
+                conv.dry_run = 1;
             }
             else if(strcmp(argv[i], "-p") ==0)
             {
@@ -344,6 +355,15 @@ int main(int argc, char** argv)
     {
         if(load_map(&conv,file) == -1)
             return -1;
+        if(conv.dry_run)
+        {
+            printf("Found %d error(s), exiting\n", conv.errors);
+            return conv.errors?-1:0;
+        }
+        else if(conv.errors > 0)
+        {
+            printf("Found %d error(s)\n", conv.errors);
+        }
         if( (i = check_pair_set_for_filter(conv.p,conv.npairs)) )
         {
             seq.usefilter = 1;
@@ -369,8 +389,8 @@ int main(int argc, char** argv)
     {
         //get address ready to send osc messages to
         seq.usein = 1;
-	//note that addr must be NULL to indicate the default localhost here,
-	//an empty address string won't do
+        //note that addr must be NULL to indicate the default localhost here,
+        //an empty address string won't do
         loaddr = lo_address_new(*addr?addr:NULL,aport);
         printf(" sending osc messages to address %s:%s\n",addr,aport);
     }

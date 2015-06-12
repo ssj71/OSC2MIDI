@@ -16,6 +16,8 @@ typedef struct _CONVERTER
     uint8_t mon_mode;
     uint8_t multi_match;
     int8_t  convert; //0 = both, 1 = o2m, -1 = m2o
+    uint8_t dry_run;
+    int errors;
 
     uint16_t npairs;
     PAIRHANDLE* p;
