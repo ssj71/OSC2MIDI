@@ -217,46 +217,221 @@ void rm_whitespace(char* str)
     }
 }
 
-//do a quick syntax check of a config line
-#define error_exit(s) { msg = s; goto errout; }
+//do a quick syntax check of a config line -ag
+
+/* This is in fact a full parser for the omm config line syntax. It doesn't do
+   any actual semantic processing right now, but simply does a thorough check
+   of the context-free syntax, so that we can be sure that it's what we expect
+   before rescanning the line in the semantic routines below.
+
+   We parse the following syntax (in EBNF):
+
+   rule ::= path argtypes ',' oscarglist ':' command '(' midiarglist ')'
+
+   path ::= OSC path string, must be non-empty
+
+   argtypes ::= OSC type string, may be empty
+
+   oscarglist ::= [ [ oscarg ] { ',' [ oscarg ] } ]
+
+   oscarg ::= [ pre ] var [ post ] | number | number '-' number
+
+   arglist ::= arg { ',' arg }
+
+   arg ::= [ pre ] var [ post ] | number
+
+   pre ::= '-' | [ number addop ] [ number '*' ]
+
+   post ::= [ mulop number ] [ addop number ]
+
+   add-op ::= '+' | '-'
+
+   mul-op ::= '*' | '/'
+
+   var ::= may contain anything but operators, comma and ':' or ')' delimiter,
+           must not be empty
+
+   NOTES:
+
+   To accommodate the widest possible range of OSC applications, the syntax is
+   deliberately lenient with the OSC path syntax and will accept any string
+   not containing whitespace. Therefore path and argtypes *must* be delimited
+   by whitespace (even if argtypes is empty).
+
+   In contrast, the parser is fairly picky about the argtypes string and only
+   allows valid OSC type symbols there.
+
+   An empty arglist, empty arguments and ranges are permitted on the left-hand
+   side, but not on the right-hand side of a mapping rule.
+
+   In order to provide good error-checking, the parser is also picky about the
+   end of the line (anything which comes after the mapping rule). We only
+   permit whitespace there, any number of semicolons and a line-end comment
+   (# ...), anything else is flagged as an error. */
+
+#define error_exit(msg,s) { msg = s; goto errout; }
+#define error_check(msg) if (msg) goto errout;
+
+char* check_arg(char* s, char delim, char **msg)
+{
+    char *t;
+    int pre = 0, var = 0;
+    // optional conditioning prefix: a[+-]b* | a[+-] | b* | - (unary minus)
+    if (*s == '-' && !isdigit(s[1]) && s[1] != '.')
+    {
+        // unary minus
+        pre = 1;
+        s++;
+        while (isspace(*s)) s++;
+    }
+    else
+    {
+        (void)strtod(s, &t);
+        if (t > s)
+        {
+            pre = 1;
+            // number
+            s = t;
+            while (isspace(*s)) s++;
+            char op = *s;
+            if (!op || !strchr("+-*", op))
+                // just a number
+                return s;
+            s++;
+            while (isspace(*s)) s++;
+            if (op != '*')
+            {
+                (void)strtod(s, &t);
+                if (t > s)
+                {
+                    // number
+                    s = t;
+                    while (isspace(*s)) s++;
+                    char op2 = *s;
+                    if (op == '-' && (op2 == ',' || op2 == delim))
+                    {
+                        // a range, this is only permitted on the lhs of a rule
+                        if (delim != ':')
+                            error_exit(*msg, "range is not allowed here");
+                        return s;
+                    }
+                    if (op2 != '*')
+                        error_exit(*msg, "expected '*'");
+                    s++;
+                    while (isspace(*s)) s++;
+                }
+            }
+        }
+    }
+    // variable
+    // may contain anything but whitespace, operator, comma and delim symbol
+    while (*s && !isspace(*s) && !strchr("+-*/,", *s) && *s!=delim)
+    {
+        var = 1;
+        s++;
+    }
+    if (pre && !var) error_exit(*msg, "expected variable");
+    while (isspace(*s)) s++;
+    // optional conditioning postfix: [*/]a[+-]b | [+-]b | [*/]a
+    char op = *s;
+    if (op && strchr("+-*/", op))
+    {
+        if (!var) error_exit(*msg, "expected variable");
+        s++;
+        while (isspace(*s)) s++;
+        (void)strtod(s, &t);
+        if (t == s) error_exit(*msg, "expected number");
+        s = t;
+        while (isspace(*s)) s++;
+        if (op != '+' && op != '-')
+        {
+            char op2 = *s;
+            if (op2 && strchr("+-", op2))
+            {
+                s++;
+                while (isspace(*s)) s++;
+                (void)strtod(s, &t);
+                if (t == s) error_exit(*msg, "expected number");
+                s = t;
+                while (isspace(*s)) s++;
+            }
+        }
+    }
+errout:
+    return s;
+}
+
 int check_config(char* config)
 {
     char *s = config, *msg = 0;
 
     while (isspace(*s)) s++;
     // OSC path
-    if (!*s) error_exit("missing osc path");
+    if (!*s) error_exit(msg, "expected osc path");
     while (*s && !isspace(*s)) s++;
+    while (isspace(*s)) s++;
     // OSC type string is optional
-    while (*s && *s!=',' && *s!=':') s++;
-    if (*s != ',') error_exit("missing ','");
+    while (*s && !isspace(*s) && *s!=',' && *s!=':')
+    {
+        if (!strchr("ihsSbfdtcmTFNI", *s)) error_exit(msg, "unknown OSC type");
+        s++;
+    }
+    if (*s != ',') error_exit(msg, "expected ','");
     s++;
+    while (isspace(*s)) s++;
     // OSC arguments are optional
-    while (*s && *s!=':') s++;
-    if (*s != ':') error_exit("missing ':'");
+    while (*s && *s!=':')
+    {
+        s = check_arg(s, ':', &msg);
+        error_check(msg);
+        if (!*s || *s == ':') break;
+        if (*s != ',') error_exit(msg, "expected ',' or ':'");
+        s++;
+        while (isspace(*s)) s++;
+    }
+    if (*s != ':') error_exit(msg, "expected ':'");
     s++;
     while (isspace(*s)) s++;
     // MIDI command name
-    if (!*s || *s=='(') error_exit("missing midi command");
-    while (*s && *s!='(') s++;
+    if (!*s || *s=='(') error_exit(msg, "expected midi command");
+    while (*s && !isspace(*s) && *s!='(') s++;
+    while (isspace(*s)) s++;
     // MIDI command arguments
-    if (*s != '(') error_exit("missing '('");
+    if (*s != '(') error_exit(msg, "expected '('");
     s++;
     while (isspace(*s)) s++;
-    if (!*s || *s==')') error_exit("missing midi arguments");
-    while (*s && *s!=')') s++;
-    if (*s != ')') error_exit("missing ')'");
+    if (!*s || *s==')') error_exit(msg, "expected midi arguments");
+    while (*s && *s!=')')
+    {
+        char *t = s;
+        s = check_arg(s, ')', &msg);
+        error_check(msg);
+        if (t == s) error_exit(msg, "expected midi argument");
+        if (!*s || *s == ')') break;
+        if (*s != ',') error_exit(msg, "expected ',' or ')'");
+        s++;
+        while (isspace(*s)) s++;
+    }
+    if (*s != ')') error_exit(msg, "expected ')'");
     s++;
     // Check the line end (everything that comes after the rule). We allow a
     // trailing semicolon, end-of-line comment and whitespace there, flag
     // everything else as an error.
     while (isspace(*s) || *s==';') s++;
-    if (*s && *s != '#') error_exit("extra text at end of line");
+    if (*s && *s != '#') error_exit(msg, "expected end of line or comment");
 
 errout:
     if (msg)
     {
-        printf("\nERROR in config line:\n%s -syntax error: %s\n\n",config,msg);
+        char mark[400];
+        int i, n = s-config;
+        if (n>0 && config[n-1]=='\n') n--;
+        strncpy(mark, config, n);
+        for (i = 0; i < n; i++)
+            if (!isspace(mark[i]))
+                mark[i] = ' ';
+        strcpy(mark+n, "^^^\n");
+        printf("\nERROR in config line:\n%s%s -syntax error: %s\n\n",config,mark,msg);
         return -1;
     }
     else
@@ -417,53 +592,54 @@ int get_pair_midicommand(char* config, PAIR* p)
       setchannel( channelNumber );  # set the global channel
       setshift( noteOffset ); # set the midi note filter shift amout
     */
-    if(strstr(midicommand,"noteon"))
+    rm_whitespace(midicommand);
+    if(!strcmp(midicommand,"noteon"))
     {
         p->opcode = 0x90;
         n = 3;
     }
-    else if(strstr(midicommand,"noteoff"))
+    else if(!strcmp(midicommand,"noteoff"))
     {
         p->opcode = 0x80;
         n = 3;
     }
-    else if(strstr(midicommand,"note"))
+    else if(!strcmp(midicommand,"note"))
     {
         p->opcode = 0x80;
         n = 4;
     }
-    else if(strstr(midicommand,"polyaftertouch"))
+    else if(!strcmp(midicommand,"polyaftertouch"))
     {
         p->opcode = 0xA0;
         n = 3;
     }
-    else if(strstr(midicommand,"controlchange"))
+    else if(!strcmp(midicommand,"controlchange"))
     {
         p->opcode = 0xB0;
         n = 3;
     }
-    else if(strstr(midicommand,"programchange"))
+    else if(!strcmp(midicommand,"programchange"))
     {
         p->opcode = 0xC0;
         n = 2;
     }
-    else if(strstr(midicommand,"aftertouch"))
+    else if(!strcmp(midicommand,"aftertouch"))
     {
         p->opcode = 0xD0;
         n = 2;
     }
-    else if(strstr(midicommand,"pitchbend"))
+    else if(!strcmp(midicommand,"pitchbend"))
     {
         p->opcode = 0xE0;
         n = 2;
     }
-    else if(strstr(midicommand,"rawmidi"))
+    else if(!strcmp(midicommand,"rawmidi"))
     {
         p->opcode = 0x00;
         n = 3;
         p->raw_midi = 1;
     }
-    else if(strstr(midicommand,"midimessage"))
+    else if(!strcmp(midicommand,"midimessage"))
     {
         p->opcode = 0x01;
         p->midi_val[0] = 0xFF;
@@ -471,21 +647,21 @@ int get_pair_midicommand(char* config, PAIR* p)
         p->raw_midi = 1;
     }
     //non-midi commands
-    else if(strstr(midicommand,"setchannel"))
+    else if(!strcmp(midicommand,"setchannel"))
     {
         p->opcode = 0x02;
         p->midi_val[0] = 0xFE;
         n = 1;
         p->set_channel = 1;
     }
-    else if(strstr(midicommand,"setvelocity"))
+    else if(!strcmp(midicommand,"setvelocity"))
     {
         p->opcode = 0x03;
         p->midi_val[0] = 0xFD;
         n = 1;
         p->set_velocity = 1;
     }
-    else if(strstr(midicommand,"setshift"))
+    else if(!strcmp(midicommand,"setshift"))
     {
         p->opcode = 0x04;
         p->midi_val[0] = 0xFC;
@@ -980,7 +1156,8 @@ PAIRHANDLE alloc_pair(char* config, table tab, float** regs, int* nkeys)
     //for cosmetic purposes, add a line end if necessary (no newline at eof)
     if (!strchr(config, '\n')) strcat(config, "\n");
     //do a quick syntax check
-    if(-1 == check_config(config)) return 0;
+    if(-1 == check_config(config))
+        return 0;
 
     p = (PAIR*)calloc(1, sizeof(PAIR));
 
