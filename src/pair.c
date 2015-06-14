@@ -98,14 +98,7 @@ void print_pair(PAIRHANDLE ph)
     }
 
     //command
-    printf("\b\b : %s",opcode2cmd(p->opcode, 0));
-    if(p->opcode==0x80)
-    {
-        //note or note off, check if 4 arguments
-        for(i=0; i<p->argc+p->argc_in_path && p->osc_map[i]!=3; i++);
-        if(i==p->argc+p->argc_in_path)
-            printf("off");
-    }
+    printf("\b\b : %s",opcode2cmd(p->opcode, p->opcode==0x80 && p->n<4));
     printf("( ");
 
     //global channel
@@ -995,6 +988,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             {
                 //for some reason they used the "note" command but then put a constant in whether it is on or off
                 if(f)p->opcode+=0x10;
+                p->n = 3;
             }
             else
             {
@@ -1540,15 +1534,10 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         //check the opcode
         if( (mymsg[0]&0xF0) != p->opcode )
         {
-            if( p->opcode == 0x80 && (mymsg[0]&0xF0) == 0x90 )
+            if( p->opcode == 0x80 && p->n == 4 && (mymsg[0]&0xF0) == 0x90 )
             {
-                //its a note on, see if pair has 3rd arg for a note() command
-                //for(i=0;i<p->argc+p->argc_in_path && p->osc_map[i]!=3;i++);
-                //if(i == p->argc+p->argc_in_path)
-                if(p->midi_map[3] == -1)
-                {
-                    return 0;
-                }
+                //this is actually a note() command with a variable in the 4th
+                //argument, which matches a note on message
                 noteon = 1;
             }
             else if( p->opcode == 0x90 && (mymsg[0]&0xF0) == 0x80 )
