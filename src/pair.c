@@ -1257,27 +1257,37 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
         place = p->osc_map[i];
         if(place != -1)
         {
-            conditioned = p->midi_scale[place]*(v - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place];
-            //same code as below for arguments to set global channel etc.
-            //assert place==0 here
-            if(p->set_channel)
+            //place only indicates one of the places that a variable occurs in
+            //the midi mapping, so in order to catch all instances of the same
+            //variable, we have to iterate over all midi arguments bound to the
+            //given osc argument here -ag
+            for(place=0; place<p->n; place++)
             {
-                msg[place+1] = ((uint8_t)conditioned)&0x7F;
-            }
-            else if(p->set_velocity)
-            {
-                msg[place+1] = ((uint8_t)conditioned)&0x7F;
-            }
-            else if(p->set_shift)
-            {
-                msg[place+1] = ((uint8_t)conditioned);
-            }
-            else
-            {
-                msg[place] += ((uint8_t)conditioned)&0x7F;
-                if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+                if(p->midi_map[place]==i)
                 {
-                    msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                    conditioned = p->midi_scale[place]*(v - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place];
+                    //same code as below for arguments to set global channel etc.
+                    //assert place==0 here
+                    if(p->set_channel)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                    }
+                    else if(p->set_velocity)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                    }
+                    else if(p->set_shift)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned);
+                    }
+                    else
+                    {
+                        msg[place] += ((uint8_t)conditioned)&0x7F;
+                        if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+                        {
+                            msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                        }
+                    }
                 }
             }
         }
@@ -1362,31 +1372,37 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                 return 0;
 
             }
-            conditioned = p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place];
-            //check if this is a message to set global channel etc.
-            if(p->set_channel)
+            for(place=0; place<p->n; place++)
             {
-                msg[place+1] = ((uint8_t)conditioned)&0x7F;
-            }
-            else if(p->set_velocity)
-            {
-                msg[place+1] = ((uint8_t)conditioned)&0x7F;
-            }
-            else if(p->set_shift)
-            {
-                msg[place+1] = ((uint8_t)conditioned);
-            }
-            //put it in the midi message
-            else if(place == 3)//only used for note on or off
-            {
-                msg[0] += ((uint8_t)(conditioned>0))<<4;
-            }
-            else
-            {
-                msg[place] += ((uint8_t)conditioned)&0x7F;
-                if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+                if(p->midi_map[place]==i+p->argc_in_path)
                 {
-                    msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                    conditioned = p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place];
+                    //check if this is a message to set global channel etc.
+                    if(p->set_channel)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                    }
+                    else if(p->set_velocity)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                    }
+                    else if(p->set_shift)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned);
+                    }
+                    //put it in the midi message
+                    else if(place == 3)//only used for note on or off
+                    {
+                        msg[0] += ((uint8_t)(conditioned>0))<<4;
+                    }
+                    else
+                    {
+                        msg[place] += ((uint8_t)conditioned)&0x7F;
+                        if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+                        {
+                            msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                        }
+                    }
                 }
             }
             //record the value for later use in reverse mapping -ag
