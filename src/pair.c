@@ -1229,7 +1229,7 @@ void free_pair(PAIRHANDLE ph)
 }
 
 //returns 1 if match is successful and msg has a message to be sent to the output
-int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int argc, uint8_t* glob_chan, uint8_t* glob_vel, int8_t *filter, uint8_t msg[])
+int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int argc, uint8_t strict_match, uint8_t* glob_chan, uint8_t* glob_vel, int8_t *filter, uint8_t msg[])
 {
     PAIR* p = (PAIR*)ph;
     //check the easy things first
@@ -1489,19 +1489,22 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
             p->regs[i+p->argc_in_path] = val;
         }
     }//for args
-    // Check for consistency of variable bindings.
-    for(i=0; i<p->argc+p->argc_in_path; i++)
+    if (strict_match)
     {
-        int j;
-        place = p->osc_map[i];
-        if(place != -1 && (j = p->midi_map[place]) != i)
+        // Check for consistency of variable bindings.
+        for(i=0; i<p->argc+p->argc_in_path; i++)
         {
-            // two different occurrences of the same variable on the lhs - check
-            // that their values are the same
-            float y1 = p->regs[i], y2 = p->regs[j];
-            float a1 = p->osc_scale[i], a2 = p->osc_scale[j];
-            float b1 = p->osc_offset[i], b2 = p->osc_offset[j];
-            if ((y1-b1)*a2 != (y2-b2)*a1) return 0;
+            int j;
+            place = p->osc_map[i];
+            if(place != -1 && (j = p->midi_map[place]) != i)
+            {
+                // two different occurrences of the same variable on the lhs - check
+                // that their values are the same
+                float y1 = p->regs[i], y2 = p->regs[j];
+                float a1 = p->osc_scale[i], a2 = p->osc_scale[j];
+                float b1 = p->osc_offset[i], b2 = p->osc_offset[j];
+                if ((y1-b1)*a2 != (y2-b2)*a1) return 0;
+            }
         }
     }
     // Handle setchannel et al. Note that the return value -1 doesn't indicate
@@ -1585,7 +1588,7 @@ int load_osc_value(lo_message oscm, char type, float val)
 }
 
 //see if incoming midi message matches this pair and create the associated OSC message
-int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path, lo_message oscm)
+int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* glob_chan, char* path, lo_message oscm)
 {
     PAIR* p = (PAIR*)ph;
     uint8_t i,m[4] = {0,0,0,0}, noteon = 0;
@@ -1748,19 +1751,22 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         strcat(path, chunk);
     }
     strcat(path, p->path[i]);
-    // Check for consistency of variable bindings.
-    for(i=0; i<p->n; i++)
+    if (strict_match)
     {
-        int j;
-        place = p->midi_map[i];
-        if(place != -1 && (j = p->osc_map[place]) != i)
+        // Check for consistency of variable bindings.
+        for(i=0; i<p->n; i++)
         {
-            // two different occurrences of the same variable on the rhs - check
-            // that their values are the same
-            uint8_t y1 = mymsg[i], y2 = mymsg[j];
-            float a1 = p->midi_scale[i], a2 = p->midi_scale[j];
-            float b1 = p->midi_offset[i], b2 = p->midi_offset[j];
-            if ((y1-b1)*a2 != (y2-b2)*a1) return 0;
+            int j;
+            place = p->midi_map[i];
+            if(place != -1 && (j = p->osc_map[place]) != i)
+            {
+                // two different occurrences of the same variable on the rhs - check
+                // that their values are the same
+                uint8_t y1 = mymsg[i], y2 = mymsg[j];
+                float a1 = p->midi_scale[i], a2 = p->midi_scale[j];
+                float b1 = p->midi_offset[i], b2 = p->midi_offset[j];
+                if ((y1-b1)*a2 != (y2-b2)*a1) return 0;
+            }
         }
     }
 

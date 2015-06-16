@@ -124,8 +124,10 @@
 #   /cow/1/moo fff, 2*a, a+3, a*100 : controlchange(channel, 10, a); 
 #   /bus/plugin/param2 i, val : controlchange(channel, val, val);
 # As you can see variables from one side are used several times on the other side.
-# If you expect messages to be converted both ways it is recommended that you use
-# strictly one to one mappings.
+# If you expect messages to be converted both ways it is better to use strictly
+# one to one mappings, since osc2midi does not normally check that multiple
+# occurrences of a variable are all matched to the same value. However, this can
+# be enforced by invoking osc2midi with the -strict option.
 
 # The important formatting details for each mapping are that the path and argment
 # types are separated by a space, the first comma indicates the first argument 
