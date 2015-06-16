@@ -1030,6 +1030,21 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             }
             p->use_glob_vel = 1;
         }
+        else if(p->midi_scale[i] == 0.0)
+        {
+            //zero scaling factor, treated as a constant
+            printf("\nWARNING in config line:\n%s -arg %i in midi command has zero scaling factor, treated as a constant\n\n",config,i);
+            if(i == 3)
+            {
+                if(f)p->opcode+=0x10;
+                p->n = 3;
+            }
+            else
+            {
+                p->midi_val[i] = p->midi_rangemax[i] = p->midi_offset[i];
+                p->midi_const[i] = 1;
+            }
+        }
         else
         {
             //get mapping
@@ -1082,14 +1097,35 @@ int get_pair_mapping(char* config, PAIR* p, int n)
         {
             //it's  used, check if it is  conditioned
             float scale=1, offset=0;
-            if(-1 == get_pair_arg_conditioning(tmp, var, &scale, &offset))//get conditioning for midi arg
+            if(-1 == get_pair_arg_conditioning(tmp, var, &scale, &offset))//get conditioning for osc arg
             {
-                printf("\nERROR in config line:\n%s could not get OSC arg conditioning for arg %s!\n\n",config,tmp);
+                printf("\nERROR in config line:\n%s -could not get OSC arg conditioning for arg %s!\n\n",config,tmp);
                 return -1;
             }
-            //scale and offset are inverted in osc
-            p->osc_scale[i] = scale;
-            p->osc_offset[i] = offset;
+            if(scale == 0.0)
+            {
+                //zero scaling factor, treated as a constant
+                printf("\nWARNING in config line:\n%s -OSC arg %s has zero scaling factor, treated as a constant\n\n",config,tmp);
+                p->osc_val[i] = p->osc_rangemax[i] = offset;
+                p->osc_const[i] = 1;
+                //remove the variable binding
+                p->osc_map[i] = -1;
+                //check to see if there's still another binding for this
+                //variable and update the midi mapping accordingly
+                for(j = i+1; j < p->argc_in_path + p->argc; j++)
+                    if(p->osc_map[j] == k)
+                        break;
+                if(j >= p->argc_in_path + p->argc) j = -1;
+                for(k = 0; k < p->n; k++)
+                    if(p->midi_map[k] == i)
+                        p->midi_map[k] = j;
+            }
+            else
+            {
+                //scale and offset are inverted in osc
+                p->osc_scale[i] = scale;
+                p->osc_offset[i] = offset;
+            }
         }
         else
         {
