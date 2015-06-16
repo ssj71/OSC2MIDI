@@ -1037,7 +1037,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             j = get_pair_osc_arg_index(var, argnames, p->argc_in_path + p->argc,k++);
             if(j >=0 )
                 p->midi_map[i] = j;
-            while(j >=0 )
+            while(j >=0 && p->osc_map[j] == -1)
             {
                 p->osc_map[j] = i;
                 //check for additional copies
