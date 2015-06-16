@@ -98,14 +98,7 @@ void print_pair(PAIRHANDLE ph)
     }
 
     //command
-    printf("\b\b : %s",opcode2cmd(p->opcode, 0));
-    if(p->opcode==0x80)
-    {
-        //note or note off, check if 4 arguments
-        for(i=0; i<p->argc+p->argc_in_path && p->osc_map[i]!=3; i++);
-        if(i==p->argc+p->argc_in_path)
-            printf("off");
-    }
+    printf("\b\b : %s",opcode2cmd(p->opcode, p->opcode==0x80 && p->n<4));
     printf("( ");
 
     //global channel
@@ -995,6 +988,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             {
                 //for some reason they used the "note" command but then put a constant in whether it is on or off
                 if(f)p->opcode+=0x10;
+                p->n = 3;
             }
             else
             {
@@ -1036,6 +1030,21 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             }
             p->use_glob_vel = 1;
         }
+        else if(p->midi_scale[i] == 0.0)
+        {
+            //zero scaling factor, treated as a constant
+            printf("\nWARNING in config line:\n%s -arg %i in midi command has zero scaling factor, treated as a constant\n\n",config,i);
+            if(i == 3)
+            {
+                if(f)p->opcode+=0x10;
+                p->n = 3;
+            }
+            else
+            {
+                p->midi_val[i] = p->midi_rangemax[i] = p->midi_offset[i];
+                p->midi_const[i] = 1;
+            }
+        }
         else
         {
             //get mapping
@@ -1043,7 +1052,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             j = get_pair_osc_arg_index(var, argnames, p->argc_in_path + p->argc,k++);
             if(j >=0 )
                 p->midi_map[i] = j;
-            while(j >=0 )
+            while(j >=0 && p->osc_map[j] == -1)
             {
                 p->osc_map[j] = i;
                 //check for additional copies
@@ -1088,14 +1097,35 @@ int get_pair_mapping(char* config, PAIR* p, int n)
         {
             //it's  used, check if it is  conditioned
             float scale=1, offset=0;
-            if(-1 == get_pair_arg_conditioning(tmp, var, &scale, &offset))//get conditioning for midi arg
+            if(-1 == get_pair_arg_conditioning(tmp, var, &scale, &offset))//get conditioning for osc arg
             {
-                printf("\nERROR in config line:\n%s could not get OSC arg conditioning for arg %s!\n\n",config,tmp);
+                printf("\nERROR in config line:\n%s -could not get OSC arg conditioning for arg %s!\n\n",config,tmp);
                 return -1;
             }
-            //scale and offset are inverted in osc
-            p->osc_scale[i] = scale;
-            p->osc_offset[i] = offset;
+            if(scale == 0.0)
+            {
+                //zero scaling factor, treated as a constant
+                printf("\nWARNING in config line:\n%s -OSC arg %s has zero scaling factor, treated as a constant\n\n",config,tmp);
+                p->osc_val[i] = p->osc_rangemax[i] = offset;
+                p->osc_const[i] = 1;
+                //remove the variable binding
+                p->osc_map[i] = -1;
+                //check to see if there's still another binding for this
+                //variable and update the midi mapping accordingly
+                for(j = i+1; j < p->argc_in_path + p->argc; j++)
+                    if(p->osc_map[j] == k)
+                        break;
+                if(j >= p->argc_in_path + p->argc) j = -1;
+                for(k = 0; k < p->n; k++)
+                    if(p->midi_map[k] == i)
+                        p->midi_map[k] = j;
+            }
+            else
+            {
+                //scale and offset are inverted in osc
+                p->osc_scale[i] = scale;
+                p->osc_offset[i] = offset;
+            }
         }
         else
         {
@@ -1263,27 +1293,37 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
         place = p->osc_map[i];
         if(place != -1)
         {
-            conditioned = p->midi_scale[place]*(v - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place];
-            //same code as below for arguments to set global channel etc.
-            //assert place==0 here
-            if(p->set_channel)
+            //place only indicates one of the places that a variable occurs in
+            //the midi mapping, so in order to catch all instances of the same
+            //variable, we have to iterate over all midi arguments bound to the
+            //given osc argument here -ag
+            for(place=0; place<p->n; place++)
             {
-                msg[place+1] = ((uint8_t)conditioned)&0x7F;
-            }
-            else if(p->set_velocity)
-            {
-                msg[place+1] = ((uint8_t)conditioned)&0x7F;
-            }
-            else if(p->set_shift)
-            {
-                msg[place+1] = ((uint8_t)conditioned);
-            }
-            else
-            {
-                msg[place] += ((uint8_t)conditioned)&0x7F;
-                if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+                if(p->midi_map[place]==i)
                 {
-                    msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                    conditioned = p->midi_scale[place]*(v - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place];
+                    //same code as below for arguments to set global channel etc.
+                    //assert place==0 here
+                    if(p->set_channel)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                    }
+                    else if(p->set_velocity)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                    }
+                    else if(p->set_shift)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned);
+                    }
+                    else
+                    {
+                        msg[place] += ((uint8_t)conditioned)&0x7F;
+                        if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+                        {
+                            msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                        }
+                    }
                 }
             }
         }
@@ -1368,31 +1408,37 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                 return 0;
 
             }
-            conditioned = p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place];
-            //check if this is a message to set global channel etc.
-            if(p->set_channel)
+            for(place=0; place<p->n; place++)
             {
-                msg[place+1] = ((uint8_t)conditioned)&0x7F;
-            }
-            else if(p->set_velocity)
-            {
-                msg[place+1] = ((uint8_t)conditioned)&0x7F;
-            }
-            else if(p->set_shift)
-            {
-                msg[place+1] = ((uint8_t)conditioned);
-            }
-            //put it in the midi message
-            else if(place == 3)//only used for note on or off
-            {
-                msg[0] += ((uint8_t)(conditioned>0))<<4;
-            }
-            else
-            {
-                msg[place] += ((uint8_t)conditioned)&0x7F;
-                if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+                if(p->midi_map[place]==i+p->argc_in_path)
                 {
-                    msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                    conditioned = p->midi_scale[place]*(val - p->osc_offset[i])/p->osc_scale[i] + p->midi_offset[place];
+                    //check if this is a message to set global channel etc.
+                    if(p->set_channel)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                    }
+                    else if(p->set_velocity)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                    }
+                    else if(p->set_shift)
+                    {
+                        msg[place+1] = ((uint8_t)conditioned);
+                    }
+                    //put it in the midi message
+                    else if(place == 3)//only used for note on or off
+                    {
+                        msg[0] += ((uint8_t)(conditioned>0))<<4;
+                    }
+                    else
+                    {
+                        msg[place] += ((uint8_t)conditioned)&0x7F;
+                        if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+                        {
+                            msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                        }
+                    }
                 }
             }
             //record the value for later use in reverse mapping -ag
@@ -1443,6 +1489,21 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
             p->regs[i+p->argc_in_path] = val;
         }
     }//for args
+    // Check for consistency of variable bindings.
+    for(i=0; i<p->argc+p->argc_in_path; i++)
+    {
+        int j;
+        place = p->osc_map[i];
+        if(place != -1 && (j = p->midi_map[place]) != i)
+        {
+            // two different occurrences of the same variable on the lhs - check
+            // that their values are the same
+            float y1 = p->regs[i], y2 = p->regs[j];
+            float a1 = p->osc_scale[i], a2 = p->osc_scale[j];
+            float b1 = p->osc_offset[i], b2 = p->osc_offset[j];
+            if ((y1-b1)*a2 != (y2-b2)*a1) return 0;
+        }
+    }
     // Handle setchannel et al. Note that the return value -1 doesn't indicate
     // an error, but that we don't need to send a midi message (ret 0 denotes
     // error).
@@ -1540,15 +1601,10 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         //check the opcode
         if( (mymsg[0]&0xF0) != p->opcode )
         {
-            if( p->opcode == 0x80 && (mymsg[0]&0xF0) == 0x90 )
+            if( p->opcode == 0x80 && p->n == 4 && (mymsg[0]&0xF0) == 0x90 )
             {
-                //its a note on, see if pair has 3rd arg for a note() command
-                //for(i=0;i<p->argc+p->argc_in_path && p->osc_map[i]!=3;i++);
-                //if(i == p->argc+p->argc_in_path)
-                if(p->midi_map[3] == -1)
-                {
-                    return 0;
-                }
+                //this is actually a note() command with a variable in the 4th
+                //argument, which matches a note on message
                 noteon = 1;
             }
             else if( p->opcode == 0x90 && (mymsg[0]&0xF0) == 0x80 )
@@ -1692,6 +1748,21 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t* glob_chan, char* path,
         strcat(path, chunk);
     }
     strcat(path, p->path[i]);
+    // Check for consistency of variable bindings.
+    for(i=0; i<p->n; i++)
+    {
+        int j;
+        place = p->midi_map[i];
+        if(place != -1 && (j = p->osc_map[place]) != i)
+        {
+            // two different occurrences of the same variable on the rhs - check
+            // that their values are the same
+            uint8_t y1 = mymsg[i], y2 = mymsg[j];
+            float a1 = p->midi_scale[i], a2 = p->midi_scale[j];
+            float b1 = p->midi_offset[i], b2 = p->midi_offset[j];
+            if ((y1-b1)*a2 != (y2-b2)*a1) return 0;
+        }
+    }
 
     return 1;
 }
