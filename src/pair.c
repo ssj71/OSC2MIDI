@@ -1734,7 +1734,13 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
         }
         else if(place != -1)
         {
-            float val = p->osc_scale[i]*(mymsg[place] - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i];
+            int midival = mymsg[place];
+            float val;
+            if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+            {
+                midival += mymsg[place+1]*128;
+            }
+            val = p->osc_scale[i]*(midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i];
             //record the value for later use in reverse mapping -ag
             p->regs[i] = val;
             sprintf(chunk, p->path[i], (int)val);
