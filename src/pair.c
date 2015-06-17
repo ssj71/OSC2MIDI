@@ -1306,7 +1306,7 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                     //assert place==0 here
                     if(p->set_channel)
                     {
-                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                        msg[place+1] = ((uint8_t)conditioned)&0x0F;
                     }
                     else if(p->set_velocity)
                     {
@@ -1416,7 +1416,7 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                     //check if this is a message to set global channel etc.
                     if(p->set_channel)
                     {
-                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                        msg[place+1] = ((uint8_t)conditioned)&0x0F;
                     }
                     else if(p->set_velocity)
                     {
