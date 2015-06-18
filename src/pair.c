@@ -1320,6 +1320,11 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                     {
                         msg[place+1] = ((uint8_t)conditioned);
                     }
+                    //put it in the midi message
+                    else if(place == 3)//only used for note on or off
+                    {
+                        msg[0] += ((uint8_t)(conditioned>0))<<4;
+                    }
                     else
                     {
                         //clamp MIDI values
