@@ -329,11 +329,15 @@ int main(int argc, char** argv)
             {
                 // global channel
                 conv.glob_chan = atoi(argv[++i]);
+		if(conv.glob_chan < 0) conv.glob_chan = 0;
+		if(conv.glob_chan > 15) conv.glob_chan = 15;
             }
             else if(strcmp(argv[i], "-vel") ==0)
             {
                 // global velocity
                 conv.glob_vel = atoi(argv[++i]);
+		if(conv.glob_vel < 0) conv.glob_vel = 0;
+		if(conv.glob_vel > 127) conv.glob_vel = 127;
             }
             else if(strcmp(argv[i], "-s") == 0)
             {
