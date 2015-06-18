@@ -1306,11 +1306,15 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                     //assert place==0 here
                     if(p->set_channel)
                     {
-                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                        if(conditioned<0) conditioned = 0;
+                        if(conditioned>15) conditioned = 15;
+                        msg[place+1] = ((uint8_t)conditioned);
                     }
                     else if(p->set_velocity)
                     {
-                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                        if(conditioned<0) conditioned = 0;
+                        if(conditioned>127) conditioned = 127;
+                        msg[place+1] = ((uint8_t)conditioned);
                     }
                     else if(p->set_shift)
                     {
@@ -1318,10 +1322,32 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                     }
                     else
                     {
-                        msg[place] += ((uint8_t)conditioned)&0x7F;
+                        //clamp MIDI values
+                        // - 0..255 for status bytes (arg #0 of rawmidi)
+                        // - 0..15 for channel (arg #0 of other commands)
+                        // - 0..127 for regular data bytes
+                        // - 0..16383 for pitch bend
+                        if(conditioned<0) conditioned = 0;
                         if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
                         {
-                            msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                            if(conditioned>16383) conditioned = 16383;
+                            msg[place] += ((uint8_t)conditioned)&0x7F;
+                            msg[place+1] += ((uint8_t)(conditioned/128.0));
+                        }
+                        else if (place > 0) // ordinary data byte
+                        {
+                            if(conditioned>127) conditioned = 127;
+                            msg[place] += ((uint8_t)conditioned);
+                        }
+                        else if (p->raw_midi) // status byte
+                        {
+                            if(conditioned>255) conditioned = 255;
+                            msg[place] += ((uint8_t)conditioned);
+                        }
+                        else // channel
+                        {
+                            if(conditioned>15) conditioned = 15;
+                            msg[place] += ((uint8_t)conditioned);
                         }
                     }
                 }
@@ -1416,11 +1442,15 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                     //check if this is a message to set global channel etc.
                     if(p->set_channel)
                     {
-                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                        if(conditioned<0) conditioned = 0;
+                        if(conditioned>15) conditioned = 15;
+                        msg[place+1] = ((uint8_t)conditioned);
                     }
                     else if(p->set_velocity)
                     {
-                        msg[place+1] = ((uint8_t)conditioned)&0x7F;
+                        if(conditioned<0) conditioned = 0;
+                        if(conditioned>127) conditioned = 127;
+                        msg[place+1] = ((uint8_t)conditioned);
                     }
                     else if(p->set_shift)
                     {
@@ -1433,10 +1463,32 @@ int try_match_osc(PAIRHANDLE ph, char* path, char* types, lo_arg** argv, int arg
                     }
                     else
                     {
-                        msg[place] += ((uint8_t)conditioned)&0x7F;
+                        //clamp MIDI values
+                        // - 0..255 for status bytes (arg #0 of rawmidi)
+                        // - 0..15 for channel (arg #0 of other commands)
+                        // - 0..127 for regular data bytes
+                        // - 0..16383 for pitch bend
+                        if(conditioned<0) conditioned = 0;
                         if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
                         {
-                            msg[place+1] += ((uint8_t)(conditioned/128.0))&0x7F;
+                            if(conditioned>16383) conditioned = 16383;
+                            msg[place] += ((uint8_t)conditioned)&0x7F;
+                            msg[place+1] += ((uint8_t)(conditioned/128.0));
+                        }
+                        else if (place > 0) // ordinary data byte
+                        {
+                            if(conditioned>127) conditioned = 127;
+                            msg[place] += ((uint8_t)conditioned);
+                        }
+                        else if (p->raw_midi) // status byte
+                        {
+                            if(conditioned>255) conditioned = 255;
+                            msg[place] += ((uint8_t)conditioned);
+                        }
+                        else // channel
+                        {
+                            if(conditioned>15) conditioned = 15;
+                            msg[place] += ((uint8_t)conditioned);
                         }
                     }
                 }
