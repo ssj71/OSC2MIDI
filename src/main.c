@@ -212,6 +212,7 @@ void usage()
     printf("    -s <value>     set default filter shift value\n");
     printf("    -multi         multi mode (check all mappings/send multiple messages)\n");
     printf("    -single        multi mode off (stop checks after first match)\n");
+    printf("    -strict        strict matches (check multiple occurrences of variables)\n");
     printf("    -mon           only print OSC messages that come into the port\n");
     printf("    -o2m           only convert OSC messages to MIDI\n");
     printf("    -m2o           only convert MIDI messages to OSC\n");
@@ -221,9 +222,14 @@ void usage()
     printf("NOTES:\n");
     printf("    By default osc2midi looks for mapping files in /usr/local/share/osc2midi/.\n");
     printf("    See default.omm in that directory on how to create your own mappings.\n");
+    printf("\n");
     printf("    Multi mode is heavier: It finds all matches, which is useful if OSC\n");
     printf("    messages contain more data than can be sent in a single MIDI message.\n");
     printf("    By default multi mode is on. Pass -single to disable.\n");
+    printf("\n");
+    printf("    Strict matches make sure that multiple occurrences of a variable are all\n");
+    printf("    matched to the same value when converting an OSC or MIDI message. This\n");
+    printf("    incurs a small overhead and is disabled by default; -strict enables it.\n");
     printf("\n");
 
     return;
@@ -247,6 +253,7 @@ int main(int argc, char** argv)
     conv.errors = 0;
     conv.mon_mode = 0;
     conv.multi_match = 1;
+    conv.strict_match = 0;
     conv.glob_chan = 0;
     conv.glob_vel = 100;
     conv.filter = 0;
@@ -260,13 +267,18 @@ int main(int argc, char** argv)
         {
             if(strcmp(argv[i], "-single") ==0)
             {
-                //monitor mode (osc messages)
+                //single matches
                 conv.multi_match = 0;
             }
             else if(strcmp(argv[i], "-multi") ==0)
             {
-                //monitor mode (osc messages)
+                //multiple matches
                 conv.multi_match = 1;
+            }
+            else if(strcmp(argv[i], "-strict") ==0)
+            {
+                //strict matches
+                conv.strict_match = 1;
             }
             else if (strcmp(argv[i], "-map") == 0)
             {
@@ -317,11 +329,15 @@ int main(int argc, char** argv)
             {
                 // global channel
                 conv.glob_chan = atoi(argv[++i]);
+		if(conv.glob_chan < 0) conv.glob_chan = 0;
+		if(conv.glob_chan > 15) conv.glob_chan = 15;
             }
             else if(strcmp(argv[i], "-vel") ==0)
             {
                 // global velocity
                 conv.glob_vel = atoi(argv[++i]);
+		if(conv.glob_vel < 0) conv.glob_vel = 0;
+		if(conv.glob_vel > 127) conv.glob_vel = 127;
             }
             else if(strcmp(argv[i], "-s") == 0)
             {

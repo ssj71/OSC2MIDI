@@ -86,7 +86,7 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
     for(j=0; j<conv->npairs; j++)
     {
         PAIRHANDLE ph = conv->p[j];
-        if( (n = try_match_osc(ph,(char *)path,(char *)types,argv,argc,&(conv->glob_chan),&(conv->glob_vel),&(conv->filter),midi)) )
+        if( (n = try_match_osc(ph,(char *)path,(char *)types,argv,argc,conv->strict_match,&(conv->glob_chan),&(conv->glob_vel),&(conv->filter),midi)) )
         {
             if(!conv->multi_match)
                 j = conv->npairs;
@@ -140,7 +140,7 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
         {
             PAIRHANDLE ph = data->p[i];
             oscm = lo_message_new();
-            if( (n = try_match_midi(ph, midi, &(data->glob_chan), path, oscm)) )
+            if( (n = try_match_midi(ph, midi, data->strict_match, &(data->glob_chan), path, oscm)) )
             {
                 if(!data->multi_match)
                     i = data->npairs;

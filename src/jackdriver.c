@@ -222,8 +222,12 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
         //turn off all currently on notes and send new note-ons
         for(j=0; j<seq->nnotes; j++)
         {
+            int note = seq->note[j]+seq->old_filter;
+            if (note < 0 || note > 127)
+                // note out of range, skip
+                continue;
             event.buffer[0] = seq->notechan[j]&0xEF;//note on to note off
-            event.buffer[1] = seq->note[j]+seq->old_filter;
+            event.buffer[1] = note;
             event.buffer[2] = 0;
 #ifdef JACK_MIDI_NEEDS_NFRAMES
             buffer = jack_midi_event_reserve(outport_buffer, 0, 3, nframes);
@@ -241,8 +245,12 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
         }
         for(j=0; j<seq->nnotes; j++)
         {
+            int note = seq->note[j]+filter;
+            if (note < 0 || note > 127)
+                // note out of range, skip
+                continue;
             event.buffer[0] = seq->notechan[j];//note on
-            event.buffer[1] = seq->note[j]+filter;
+            event.buffer[1] = note;
             event.buffer[2] = seq->notevel[j];
 #ifdef JACK_MIDI_NEEDS_NFRAMES
             buffer = jack_midi_event_reserve(outport_buffer, 0, 3, nframes);
@@ -285,7 +293,8 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
             {
                 //not sysex or something
 
-                if((event.buffer[0]&0xF0) == 0x80)
+                if((event.buffer[0]&0xF0) == 0x80 ||
+                        ((event.buffer[0]&0xF0) == 0x90 && event.buffer[2] == 0))
                 {
                     uint8_t on = seq->note[0];
                     //note off event
@@ -308,7 +317,11 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                     {
                         seq->nnotes--;
                     }
-                    event.buffer[1] += filter;
+                    int note = event.buffer[1]+filter;
+                    if (note < 0 || note > 127)
+                        // note out of range, skip
+                        continue;
+                    event.buffer[1] = note;
                 }
                 else if((event.buffer[0]&0xF0) == 0x90)
                 {
@@ -328,7 +341,11 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                         seq->note[seq->nnotes] = event.buffer[1];
                         seq->notevel[seq->nnotes++] = event.buffer[2];
                     }
-                    event.buffer[1] += filter;
+                    int note = event.buffer[1]+filter;
+                    if (note < 0 || note > 127)
+                        // note out of range, skip
+                        continue;
+                    event.buffer[1] = note;
                 }
 
             }
