@@ -235,9 +235,16 @@ void usage()
     return;
 }
 
+static int missing_arg(const char *opt)
+{
+    printf("Missing argument! %s\n",opt);
+    usage();
+    return -1;
+}
+
 int main(int argc, char** argv)
 {
-    char file[200], port[200], addr[200], aport[50];
+    char file[200], port[200], addr[200];
     int i;
     lo_address loaddr;
     CONVERTER conv;
@@ -246,8 +253,7 @@ int main(int argc, char** argv)
     //defaults
     strcpy(file,"default.omm");
     strcpy(port,"57120");
-    strcpy(addr,"");
-    strcpy(aport,"8000");
+    strcpy(addr,"osc.udp://localhost:8000");
     conv.verbose = 0;
     conv.dry_run = 0;
     conv.errors = 0;
@@ -282,6 +288,7 @@ int main(int argc, char** argv)
             }
             else if (strcmp(argv[i], "-map") == 0)
             {
+                if (!argv[i+1]) return missing_arg(argv[i]);
                 //load map file
                 strcpy(file,argv[++i]);
             }
@@ -303,6 +310,7 @@ int main(int argc, char** argv)
             }
             else if (strcmp(argv[i], "-m") == 0)
             {
+                if (!argv[i+1]) return missing_arg(argv[i]);
                 //load map file
                 strcpy(file,argv[++i]);
             }
@@ -313,34 +321,39 @@ int main(int argc, char** argv)
             }
             else if(strcmp(argv[i], "-p") ==0)
             {
+                if (!argv[i+1]) return missing_arg(argv[i]);
                 //set osc server port
                 strcpy(port,argv[++i]);
             }
             else if(strcmp(argv[i], "-a") ==0)
             {
-                //osc client address to send return osc messaged so
-                //strcpy(addr,argv[++i]);
-                if(!sscanf(argv[++i],"%[^:]:%[^:]",addr,aport))
-                {
-                    sscanf(argv[i],":%[^:]",aport);
-                }
+                if (!argv[i+1]) return missing_arg(argv[i]);
+                //osc client address to send return osc messages to
+                if(lo_url_get_protocol_id(argv[i+1]) < 0)
+                    //protocol id missing, assume osc.udp
+                    sprintf(addr, "osc.udp://%s", argv[++i]);
+                else
+                    strcpy(addr, argv[++i]);
             }
             else if(strcmp(argv[i], "-c") ==0)
             {
+                if (!argv[i+1]) return missing_arg(argv[i]);
                 // global channel
                 conv.glob_chan = atoi(argv[++i]);
-		if(conv.glob_chan < 0) conv.glob_chan = 0;
-		if(conv.glob_chan > 15) conv.glob_chan = 15;
+                if(conv.glob_chan < 0) conv.glob_chan = 0;
+                if(conv.glob_chan > 15) conv.glob_chan = 15;
             }
             else if(strcmp(argv[i], "-vel") ==0)
             {
+                if (!argv[i+1]) return missing_arg(argv[i]);
                 // global velocity
                 conv.glob_vel = atoi(argv[++i]);
-		if(conv.glob_vel < 0) conv.glob_vel = 0;
-		if(conv.glob_vel > 127) conv.glob_vel = 127;
+                if(conv.glob_vel < 0) conv.glob_vel = 0;
+                if(conv.glob_vel > 127) conv.glob_vel = 127;
             }
             else if(strcmp(argv[i], "-s") == 0)
             {
+                if (!argv[i+1]) return missing_arg(argv[i]);
                 // filter shift
                 conv.filter = atoi(argv[++i]);
                 seq.usefilter = 1;
@@ -405,10 +418,8 @@ int main(int argc, char** argv)
     {
         //get address ready to send osc messages to
         seq.usein = 1;
-        //note that addr must be NULL to indicate the default localhost here,
-        //an empty address string won't do
-        loaddr = lo_address_new(*addr?addr:NULL,aport);
-        printf(" sending osc messages to address %s:%s\n",addr,aport);
+        loaddr = lo_address_new_from_url(addr);
+        printf(" sending osc messages to address %s\n",addr);
     }
     else
     {
