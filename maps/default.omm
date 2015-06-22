@@ -22,7 +22,7 @@
 /leftMidCut i, val : controlchange( channel, 2, val);
 /leftLowCut i, val : controlchange( channel, 3, val);
 /leftVolume f, val : controlchange( channel, 4, val);
-/leftMulti/{i} f, indx,val : controlchange( channel, 5+indx, val);
+/leftMulti/{i} i, indx,val : controlchange( channel, 5+indx, val);
 /leftCue i, val : controlchange( channel, 9, val);
 /crossfader f, val : controlchange( channel, 10, val);
 /crossfader i, val : controlchange( channel, 10, val);
@@ -30,7 +30,7 @@
 /rightMidCut i, val : controlchange( channel, 12, val);
 /rightLowCut i, val : controlchange( channel, 13, val);
 /rightVolume f, val : controlchange( channel, 14, val);
-/rightMulti/{i} f, indx,val : controlchange( channel, 15+indx, val);
+/rightMulti/{i} i, indx,val : controlchange( channel, 15+indx, val);
 /rightCue i, val : controlchange( channel, 19, val);
  # conways game of life
 /life/{i} i, -note+127, val : note( channel, note,velocity, val);
