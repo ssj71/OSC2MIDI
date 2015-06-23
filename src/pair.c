@@ -474,7 +474,7 @@ int get_pair_path(char* config, char* path, PAIR* p)
         prev++;
     }
     //allocate space for end of path and copy
-    p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*strlen(prev));
+    p->path[p->argc_in_path] = (char*)malloc(sizeof(char)*(strlen(prev)+1));
     strcpy(p->path[p->argc_in_path],prev);
     return 0;
 }
