@@ -131,7 +131,7 @@ int strkey(table tab, char* path, char* argtypes, int* nkeys)
         // new key, add a new entry to the regs table
         elem el = (elem)malloc(sizeof(struct elem));
         el->key = key;
-        el->k = *nkeys++;
+        el->k = (*nkeys)++;
         table_insert(tab, el);
         e = el;
     }
