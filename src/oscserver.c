@@ -127,7 +127,7 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
 //client side
 void convert_midi_in(lo_address addr, CONVERTER* data)
 {
-    uint8_t i,n;
+    int i,n;
     uint8_t midi[3];
 
     while(pop_midi(data->seq,midi))
