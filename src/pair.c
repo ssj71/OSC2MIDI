@@ -124,7 +124,17 @@ void print_pair(PAIRHANDLE ph)
     }
 
     //midi arg1
-    if(p->midi_const[1] == 2)
+    if(p->opcode == 0xE0 && p->midi_const[1])
+    {
+        //pitchbend, use 14 bit values
+        int min = p->midi_val[1]+128*p->midi_val[2];
+        int max = p->midi_rangemax[1]+128*p->midi_rangemax[2];
+        if(p->midi_const[1] == 2)
+            printf(", %i-%i",min, max);
+        else if(p->midi_const[1] == 1)
+            printf(", %i",min);
+    }
+    else if(p->midi_const[1] == 2)
         printf(", %i-%i",p->midi_val[1], p->midi_rangemax[1]);
     else if(p->midi_const[1] == 1)
         printf(", %i",p->midi_val[1]);
@@ -992,9 +1002,21 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             }
             else
             {
-                p->midi_val[i] = (uint8_t)f;
-                p->midi_rangemax[i] = (uint8_t)f2;
+                p->midi_val[i] = ((uint8_t)f)&0x7f;
+                p->midi_rangemax[i] = ((uint8_t)f2)&0x7f;
                 p->midi_const[i] = j;
+                if(p->opcode == 0xE0 && i == 1)
+                {
+                    //pitchbend, store the MSB
+                    ++i;
+                    p->midi_val[i] = ((uint8_t)(f/128.0))&0x7f;
+                    p->midi_rangemax[i] = ((uint8_t)(f2/128.0))&0x7f;
+                    //default values
+                    p->midi_map[i] = -1;
+                    p->midi_scale[i] = 1;
+                    p->midi_offset[i] = 0;
+                    p->midi_const[i] = 0;
+                }
             }
         }
         else if(-1 == get_pair_arg_conditioning(marg[i], var, &p->midi_scale[i], &p->midi_offset[i]))//get conditioning for midi arg
@@ -1691,12 +1713,27 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             return 0;
         }
 
-        if(p->midi_const[1] && (mymsg[1] < p->midi_val[1] || mymsg[1] > p->midi_rangemax[1]))
+        //check the remaining arguments
+        if(p->opcode == 0xE0)
+        {
+            //pitchbend, compare 14 bit values
+            if(p->midi_const[1])
+            {
+                int min = p->midi_val[1]+128*p->midi_val[2];
+                int max = p->midi_rangemax[1]+128*p->midi_rangemax[2];
+                int val = mymsg[1]+128*mymsg[2];
+                if(val < min || val > max)
+                {
+                    return 0;
+                }
+            }
+        }
+        //anything else, compare the individual data bytes
+        else if(p->midi_const[1] && (mymsg[1] < p->midi_val[1] || mymsg[1] > p->midi_rangemax[1]))
         {
             return 0;
         }
-
-        if(p->midi_const[2] && (mymsg[2] < p->midi_val[2] || mymsg[2] > p->midi_rangemax[2]))
+        else if(p->midi_const[2] && (mymsg[2] < p->midi_val[2] || mymsg[2] > p->midi_rangemax[2]))
         {
             return 0;
         }
@@ -1985,6 +2022,11 @@ void print_midi(PAIRHANDLE ph, uint8_t msg[])
     {
         // single data byte
         printf("%s ( %i, %i )", opcode2cmd(msg[0],1), msg[0]&0x0F, msg[1]);
+    }
+    else if (status == 0xe0)
+    {
+        // pitch bend
+        printf("%s ( %i, %i )", opcode2cmd(msg[0],1), msg[0]&0x0F, msg[1]+128*msg[2]);
     }
     else
     {
