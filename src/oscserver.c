@@ -144,7 +144,6 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
             {
                 if(!data->multi_match)
                     i = data->npairs;
-
                 if(data->verbose)
                 {
                     if(first)
