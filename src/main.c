@@ -119,7 +119,7 @@ int load_map(CONVERTER* conv, char* file)
     if(!map)
     {
         //try default packaged install location
-        strcpy(path,"/usr/local/share/osc2midi/");
+        strcpy(path,"/usr/share/osc2midi/");
         map = fopen(strcat(path,file),"r");
     }
     if(!map)
