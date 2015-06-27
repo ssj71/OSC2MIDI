@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 2.8)
 
 project (osc2midi)
 
-set(CMAKE_C_FLAGS "-Wall -g")
+set(CMAKE_C_FLAGS "-Wall -g -DPREFIX='\"${CMAKE_INSTALL_PREFIX}\"'")
 
 # check for our various libraries
 find_package(PkgConfig)

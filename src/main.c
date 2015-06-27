@@ -16,6 +16,10 @@
 #include"jackdriver.h"
 #include"ht_stuff.h"
 
+#ifndef PREFIX
+#define PREFIX "/usr/local"
+#endif
+
 uint8_t quit = 0;
 
 void quitter(int sig)
@@ -108,18 +112,7 @@ int load_map(CONVERTER* conv, char* file)
     if(!map)
     {
         //try default install location
-        strcpy(path,"/usr/local/share/osc2midi/");
-        map = fopen(strcat(path,file),"r");
-    }
-    if(!map)
-    {
-        //try with extra .omm
-        map = fopen(strcat(path,".omm"),"r");
-    }
-    if(!map)
-    {
-        //try default packaged install location
-        strcpy(path,"/usr/share/osc2midi/");
+        strcpy(path,PREFIX "/share/osc2midi/");
         map = fopen(strcat(path,file),"r");
     }
     if(!map)
