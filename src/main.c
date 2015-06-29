@@ -432,6 +432,7 @@ int main(int argc, char** argv)
 
     if(conv.verbose)
         printf("Ready.\n");
+    fflush(stdout);
 
     signal(SIGINT, quitter);
     while(!quit)
