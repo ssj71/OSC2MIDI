@@ -540,7 +540,6 @@ int get_pair_argtypes(char* config, char* path, PAIR* p, table tab, float** regs
         case 'F'://false
         case 'N'://nil
         case 'I'://infinity
-            p->osc_map[j] = -1;//initialize mapping to be not used
             p->types[j++] = argtypes[i];
             p->argc++;
         case ' ':
@@ -553,7 +552,7 @@ int get_pair_argtypes(char* config, char* path, PAIR* p, table tab, float** regs
     }
     p->types[j] = 0;//null terminate. It's good practice
     for(i=0; i<len+p->argc_in_path; i++)
-        p->osc_map[j] = -1;//initialize mapping for in-path args
+        p->osc_map[i] = -1;//initialize mapping for all args
     return 0;
 }
 

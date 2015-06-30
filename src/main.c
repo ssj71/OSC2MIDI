@@ -54,7 +54,7 @@ void init_regs(float ***regs, int n)
 int load_map(CONVERTER* conv, char* file)
 {
     int i;
-    char path[200],line[400],*home;
+    char path[200],line[400],prefix[400],*home;
     FILE* map = NULL;
     FILE* tmp = NULL;
     PAIRHANDLE *p;
@@ -156,12 +156,39 @@ int load_map(CONVERTER* conv, char* file)
     int nkeys = 0;
     rewind(map);
     i=0;
+    *prefix = 0;
     while(!feof(map))
     {
+        char rule[800];
         if (!fgets(line,400,map)) break;
         if(!is_empty(line))
         {
-            p[i] = alloc_pair(line, conv->tab, conv->registers, &nkeys);
+            // This provides a quick and dirty way to left-factor rules, where
+            // the same osc message is mapped to different midi messages. -ag
+            char *s = line;
+            while (*s && isspace(*s)) ++s;
+            if (*s == ':')
+            {
+                // Line starts with ':' delimiter, use prefix from previous
+                // rule.
+                strcat(strcpy(rule, prefix), s);
+            }
+            else
+            {
+                // Skip over the OSC path.
+                while (*s && !isspace(*s)) ++s;
+                // Skip over the rest of the lhs of the rule.
+                while (*s && *s != ':') ++s;
+                if (*s == ':')
+                {
+                    // Complete rule, store prefix for subsequent rules.
+                    int n = s-line;
+                    strncpy(prefix, line, n);
+                    prefix[n] = 0;
+                }
+                strcpy(rule, line);
+            }
+            p[i] = alloc_pair(rule, conv->tab, conv->registers, &nkeys);
             if(p[i++])
             {
                 if(conv->verbose)
