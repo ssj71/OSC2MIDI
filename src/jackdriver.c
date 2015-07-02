@@ -347,6 +347,15 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                         continue;
                     event.buffer[1] = note;
                 }
+                else if((event.buffer[0]&0xF0) == 0xA0)
+                {
+                    //polyphonic aftertouch event (just transpose)
+                    int note = event.buffer[1]+filter;
+                    if (note < 0 || note > 127)
+                        // note out of range, skip
+                        continue;
+                    event.buffer[1] = note;
+                }
 
             }
 
