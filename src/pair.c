@@ -1858,6 +1858,8 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
                 uint8_t y1 = mymsg[i], y2 = mymsg[j];
                 float a1 = p->midi_scale[i], a2 = p->midi_scale[j];
                 float b1 = p->midi_offset[i], b2 = p->midi_offset[j];
+                if (i==0) y1 &= 0xF;
+                if (j==0) y2 &= 0xF;
                 if ((y1-b1)*a2 != (y2-b2)*a1) return 0;
             }
         }
