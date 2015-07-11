@@ -1760,14 +1760,8 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             }
             else
             {
-                // value not in message, grab previously recorded value -ag
-                float val = p->regs[i+p->argc_in_path];
-                // prescribed range of the message (if it's not a constant, then this is set to default 0)
-                float min = p->osc_val[i + p->argc_in_path],
-                      max = p->osc_rangemax[i + p->argc_in_path];
-                // fall back to default value if the recorded value falls out of the prescribed range
-                if (p->osc_const[i+p->argc_in_path] && (val < min || val > max))
-                    val = min;
+                // value not in message, grab default or previously recorded value -ag
+                float val = p->osc_const[i+p->argc_in_path]?p->osc_val[i+p->argc_in_path]:p->regs[i+p->argc_in_path];
                 load_osc_value( oscm, p->types[i], val );
             }
         }
@@ -1806,11 +1800,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             else
             {
                 //we have no idea what should be in these, so just load a previously recorded value or the defaults
-                float val = p->regs[i+p->argc_in_path];
-                float min = p->osc_val[i + p->argc_in_path],
-                      max = p->osc_rangemax[i + p->argc_in_path];
-                if (p->osc_const[i+p->argc_in_path] && (val < min || val > max))
-                    val = min;
+                float val = p->osc_const[i+p->argc_in_path]?p->osc_val[i+p->argc_in_path]:p->regs[i+p->argc_in_path];
                 load_osc_value( oscm, p->types[i], val );
             }
         }
@@ -1840,11 +1830,8 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
         }
         else
         {
-            // value not in message, grab previously recorded value -ag
-            float val = p->regs[i];
-            float min = p->osc_val[i], max = p->osc_rangemax[i];
-            if (p->osc_const[i] && (val < min || val > max))
-                val = min;
+            // value not in message, grab default or previously recorded value -ag
+            float val = p->osc_const[i]?p->osc_val[i]:p->regs[i];
             sprintf(chunk, p->path[i], (int)val);
         }
         strcat(path, chunk);
