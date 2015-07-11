@@ -1749,8 +1749,15 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             {
                 int midival = mymsg[place];
                 float val;
-                if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+                if(place == 0)
                 {
+                    //this is the status byte, actual argument is the channel
+                    //number in the lo-nibble
+                    midival &= 0xF;
+                }
+                else if(p->opcode == 0xE0 && place == 1)
+                {
+                    //pitchbend is special case (14 bit number)
                     midival += mymsg[place+1]*128;
                 }
                 val = p->osc_scale[i+p->argc_in_path]*((float)midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path];
