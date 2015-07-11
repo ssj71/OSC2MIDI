@@ -1860,7 +1860,8 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
                 float b1 = p->midi_offset[i], b2 = p->midi_offset[j];
                 if (i==0) y1 &= 0xF;
                 if (j==0) y2 &= 0xF;
-                if ((y1-b1)*a2 != (y2-b2)*a1) return 0;
+                // give some leeway here to account for the rounding of MIDI arguments
+                if (y1 != ((int)((y2-b2)*a1/a2+b1))) return 0;
             }
         }
     }
