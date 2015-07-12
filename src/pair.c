@@ -1826,8 +1826,15 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
         {
             int midival = mymsg[place];
             float val;
-            if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+            if(!p->raw_midi && place == 0)
             {
+                //this is the status byte, actual argument is the channel
+                //number in the lo-nibble
+                midival &= 0xF;
+            }
+            else if(p->opcode == 0xE0 && place == 1)
+            {
+                //pitchbend is special case (14 bit number)
                 midival += mymsg[place+1]*128;
             }
             val = p->osc_scale[i]*(midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i];
@@ -1858,8 +1865,11 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
                 uint8_t y1 = mymsg[i], y2 = mymsg[j];
                 float a1 = p->midi_scale[i], a2 = p->midi_scale[j];
                 float b1 = p->midi_offset[i], b2 = p->midi_offset[j];
-                if (i==0) y1 &= 0xF;
-                if (j==0) y2 &= 0xF;
+                if (!p->raw_midi)
+                {
+                    if (i==0) y1 &= 0xF;
+                    if (j==0) y2 &= 0xF;
+                }
                 // give some leeway here to account for the rounding of MIDI arguments
                 if (y1 != ((int)((y2-b2)*a1/a2+b1))) return 0;
             }
