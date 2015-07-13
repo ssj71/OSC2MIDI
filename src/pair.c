@@ -1073,7 +1073,7 @@ int get_pair_mapping(char* config, PAIR* p, int n)
             j = get_pair_osc_arg_index(var, argnames, p->argc_in_path + p->argc,k++);
             if(j >=0 )
                 p->midi_map[i] = j;
-            while(j >=0 && p->osc_map[j] == -1)
+            while(j >=0)
             {
                 p->osc_map[j] = i;
                 //check for additional copies
@@ -1749,8 +1749,15 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             {
                 int midival = mymsg[place];
                 float val;
-                if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+                if(place == 0)
                 {
+                    //this is the status byte, actual argument is the channel
+                    //number in the lo-nibble
+                    midival &= 0xF;
+                }
+                else if(p->opcode == 0xE0 && place == 1)
+                {
+                    //pitchbend is special case (14 bit number)
                     midival += mymsg[place+1]*128;
                 }
                 val = p->osc_scale[i+p->argc_in_path]*((float)midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path];
@@ -1760,14 +1767,8 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             }
             else
             {
-                // value not in message, grab previously recorded value -ag
-                float val = p->regs[i+p->argc_in_path];
-                // prescribed range of the message (if it's not a constant, then this is set to default 0)
-                float min = p->osc_val[i + p->argc_in_path],
-                      max = p->osc_rangemax[i + p->argc_in_path];
-                // fall back to default value if the recorded value falls out of the prescribed range
-                if (p->osc_const[i+p->argc_in_path] && (val < min || val > max))
-                    val = min;
+                // value not in message, grab default or previously recorded value -ag
+                float val = p->osc_const[i+p->argc_in_path]?p->osc_val[i+p->argc_in_path]:p->regs[i+p->argc_in_path];
                 load_osc_value( oscm, p->types[i], val );
             }
         }
@@ -1806,11 +1807,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             else
             {
                 //we have no idea what should be in these, so just load a previously recorded value or the defaults
-                float val = p->regs[i+p->argc_in_path];
-                float min = p->osc_val[i + p->argc_in_path],
-                      max = p->osc_rangemax[i + p->argc_in_path];
-                if (p->osc_const[i+p->argc_in_path] && (val < min || val > max))
-                    val = min;
+                float val = p->osc_const[i+p->argc_in_path]?p->osc_val[i+p->argc_in_path]:p->regs[i+p->argc_in_path];
                 load_osc_value( oscm, p->types[i], val );
             }
         }
@@ -1829,8 +1826,15 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
         {
             int midival = mymsg[place];
             float val;
-            if(p->opcode == 0xE0 && place == 1)//pitchbend is special case (14 bit number)
+            if(!p->raw_midi && place == 0)
             {
+                //this is the status byte, actual argument is the channel
+                //number in the lo-nibble
+                midival &= 0xF;
+            }
+            else if(p->opcode == 0xE0 && place == 1)
+            {
+                //pitchbend is special case (14 bit number)
                 midival += mymsg[place+1]*128;
             }
             val = p->osc_scale[i]*(midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i];
@@ -1840,11 +1844,8 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
         }
         else
         {
-            // value not in message, grab previously recorded value -ag
-            float val = p->regs[i];
-            float min = p->osc_val[i], max = p->osc_rangemax[i];
-            if (p->osc_const[i] && (val < min || val > max))
-                val = min;
+            // value not in message, grab default or previously recorded value -ag
+            float val = p->osc_const[i]?p->osc_val[i]:p->regs[i];
             sprintf(chunk, p->path[i], (int)val);
         }
         strcat(path, chunk);
@@ -1864,7 +1865,13 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
                 uint8_t y1 = mymsg[i], y2 = mymsg[j];
                 float a1 = p->midi_scale[i], a2 = p->midi_scale[j];
                 float b1 = p->midi_offset[i], b2 = p->midi_offset[j];
-                if ((y1-b1)*a2 != (y2-b2)*a1) return 0;
+                if (!p->raw_midi)
+                {
+                    if (i==0) y1 &= 0xF;
+                    if (j==0) y2 &= 0xF;
+                }
+                // give some leeway here to account for the rounding of MIDI arguments
+                if (y1 != ((int)((y2-b2)*a1/a2+b1))) return 0;
             }
         }
     }
