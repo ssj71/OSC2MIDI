@@ -1,7 +1,17 @@
 #this mapping works with all the default widgets in androsc
 
-/vslider f, a : controlchange( channel, 1, a );
-/hslider f, a : controlchange( channel, 2, a );
+#template 1,2,3
 button i, a : controlchange( channel, 5, a );
-/pad ff, a,b : controlchange( channel, 3, a );
-/pad ff, a,b : controlchange( channel, 4, b );
+#template 2
+/vslider f, a : controlchange( channel, 1, a*127 );
+/hslider f, a : controlchange( channel, 2, a*127 );
+pad ff, a,b : controlchange( channel, 3, a*1.27 );
+pad ff, a,b : controlchange( channel, 4, b*1.27 ); 
+#template 3
+/push i, a : controlchange( channel, 6, a*127 );
+/toggle i, a : controlchange( channel, 7, a*127 );
+/vsliderme f, a : controlchange( channel, 8, a*127 );
+/vsliderme ff, a,a : controlchange( channel, 9, a );
+/hslider f, a : controlchange( channel, 10, a*1.27 ); #this one is different between templates 2 & 3
+pad fi, a,b : controlchange( channel, 11, a*12.7 );
+pad fi, a,b : controlchange( channel, 12, b*1.27 );
