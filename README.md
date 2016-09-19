@@ -84,5 +84,6 @@ as an issue in github or do a pull request so it can be included with the source
 
 Also included with this source code are some custom interfaces that can be
 loaded into the Control app for Android and iOS. These can also be accessed
-through the URL http://ssj71/github.io/OSC2MIDI/interfaces/[interface_name].js
-for convenient loading into Control.
+through the URL http://ssj71.github.io/OSC2MIDI/interfaces/[interface_name].js
+for convenient loading into Control. For Example: 
+http://ssj71.github.io/OSC2MIDI/interfaces/gen_synth_phone.js
