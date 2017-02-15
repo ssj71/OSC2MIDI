@@ -59,7 +59,7 @@ Android app. Other included mappings are:
 
 Mappings are in plain text and are completely human readable. If you wish to
 make your own map file or tweak the existing ones there is extensive
-documentation in [syntax.md] and also the default map file installed to 
+documentation in [syntax.md](syntax.md) and also the default map file installed to 
 /usr/local/share/osc2midi/default.omm or found in the maps/ directory of
 this repository.
 
