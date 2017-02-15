@@ -59,7 +59,9 @@ Android app. Other included mappings are:
 
 Mappings are in plain text and are completely human readable. If you wish to
 make your own map file or tweak the existing ones there is extensive
-documentation in /usr/local/share/osc2midi/default.omm.
+documentation in [syntax.md] and also the default map file installed to 
+/usr/local/share/osc2midi/default.omm or found in the maps/ directory of
+this repository.
 
 You can make your own mappings and store them in $XDG_CONFIG_HOME/osc2midi/
 which is usually located at ~/.config/osc2midi/. Mappings in this directory
