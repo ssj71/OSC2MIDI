@@ -1688,14 +1688,6 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
                 //argument, which matches a note on message
                 noteon = 1;
             }
-            else if( p->opcode == 0x90 && (mymsg[0]&0xF0) == 0x80 )
-            {
-                //it's a note off, and while we expected to see a note on, a note
-                //off can always be interpreted as a note on with a velocity of
-                //0, so let's just pretend we got that instead - ag
-                mymsg[0] += 0x10;
-                mymsg[2] = 0;
-            }
             else
             {
                 return 0;
