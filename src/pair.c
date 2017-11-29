@@ -1673,23 +1673,14 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
     int8_t place;
     char chunk[100];
 
-    // We may have to mutate the MIDI message below, so we actually work on
-    // this copy in order to keep the original message unscathed. -ag
-    uint8_t mymsg[3] = {msg[0],msg[1],msg[2]};
-    if( (mymsg[0]&0xF0) == 0x90 && mymsg[2] == 0x00)
-    {
-        //this is actually a noteon 0 which is the same as note-off
-        //convert it before we try to pair it;
-        mymsg[0] -= 0x10;
-        mymsg[2] = 64;
-    }
+    //note that all noteoff messages have been converted to 0x90 opcode before this is called
 
     if(!p->raw_midi)
     {
         //check the opcode
-        if( (mymsg[0]&0xF0) != p->opcode )
+        if( (msg[0]&0xF0) != p->opcode )
         {
-            if( p->opcode == 0x80 && p->n == 4 && (mymsg[0]&0xF0) == 0x90 )
+            if( p->opcode == 0x80 && p->n == 4 && (msg[0]&0xF0) == 0x90 )
             {
                 //this is actually a note() command with a variable in the 4th
                 //argument, which matches a note on message
@@ -1702,11 +1693,11 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
         }
 
         //check the channel
-        if(p->use_glob_chan && (mymsg[0]&0x0F) != *glob_chan)
+        if(p->use_glob_chan && (msg[0]&0x0F) != *glob_chan)
         {
             return 0;
         }
-        else if(p->midi_const[0] && ((mymsg[0]&0x0F) < p->midi_val[0] || (mymsg[0]&0x0F) > p->midi_rangemax[0]))
+        else if(p->midi_const[0] && ((msg[0]&0x0F) < p->midi_val[0] || (msg[0]&0x0F) > p->midi_rangemax[0]))
         {
             return 0;
         }
@@ -1719,7 +1710,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             {
                 int min = p->midi_val[1]+128*p->midi_val[2];
                 int max = p->midi_rangemax[1]+128*p->midi_rangemax[2];
-                int val = mymsg[1]+128*mymsg[2];
+                int val = msg[1]+128*msg[2];
                 if(val < min || val > max)
                 {
                     return 0;
@@ -1727,11 +1718,11 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             }
         }
         //anything else, compare the individual data bytes
-        else if(p->midi_const[1] && (mymsg[1] < p->midi_val[1] || mymsg[1] > p->midi_rangemax[1]))
+        else if(p->midi_const[1] && (msg[1] < p->midi_val[1] || msg[1] > p->midi_rangemax[1]))
         {
             return 0;
         }
-        else if(p->midi_const[2] && (mymsg[2] < p->midi_val[2] || mymsg[2] > p->midi_rangemax[2]))
+        else if(p->midi_const[2] && (msg[2] < p->midi_val[2] || msg[2] > p->midi_rangemax[2]))
         {
             return 0;
         }
@@ -1746,7 +1737,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             }
             else if(place != -1)
             {
-                int midival = mymsg[place];
+                int midival = msg[place];
                 float val;
                 if(place == 0)
                 {
@@ -1757,7 +1748,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
                 else if(p->opcode == 0xE0 && place == 1)
                 {
                     //pitchbend is special case (14 bit number)
-                    midival += mymsg[place+1]*128;
+                    midival += msg[place+1]*128;
                 }
                 val = p->osc_scale[i+p->argc_in_path]*((float)midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path];
                 //record the value for later use in reverse mapping -ag
@@ -1779,7 +1770,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
         for(i=0; i<p->n; i++)
         {
             if(p->midi_map[i] == -1 &&
-                    (mymsg[i] < p->midi_val[i] || mymsg[i] > p->midi_rangemax[i]))
+                    (msg[i] < p->midi_val[i] || msg[i] > p->midi_rangemax[i]))
                 return 0;
         }
         for(i=0; i<p->argc; i++)
@@ -1789,15 +1780,15 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             {
                 if (p->n!=1)
                     return 0; // this is only supported for midimessage()
-                m[1] = mymsg[0];
-                m[2] = mymsg[1];
-                m[3] = mymsg[2];
+                m[1] = msg[0];
+                m[2] = msg[1];
+                m[3] = msg[2];
                 m[0] = 0;//port ID
                 lo_message_add_midi(oscm,m);
             }
             else if(place != -1)
             {
-                int midival = mymsg[place];
+                int midival = msg[place];
                 float val = p->osc_scale[i+p->argc_in_path]*((float)midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i+p->argc_in_path];
                 //record the value for later use in reverse mapping -ag
                 p->regs[i+p->argc_in_path] = val;
@@ -1823,7 +1814,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
         }
         else if(place != -1)
         {
-            int midival = mymsg[place];
+            int midival = msg[place];
             float val;
             if(!p->raw_midi && place == 0)
             {
@@ -1834,7 +1825,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             else if(p->opcode == 0xE0 && place == 1)
             {
                 //pitchbend is special case (14 bit number)
-                midival += mymsg[place+1]*128;
+                midival += msg[place+1]*128;
             }
             val = p->osc_scale[i]*(midival - p->midi_offset[place]) / p->midi_scale[place] + p->osc_offset[i];
             //record the value for later use in reverse mapping -ag
@@ -1861,7 +1852,7 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
             {
                 // two different occurrences of the same variable on the rhs - check
                 // that their values are the same
-                uint8_t y1 = mymsg[i], y2 = mymsg[j];
+                uint8_t y1 = msg[i], y2 = msg[j];
                 float a1 = p->midi_scale[i], a2 = p->midi_scale[j];
                 float b1 = p->midi_offset[i], b2 = p->midi_offset[j];
                 if (!p->raw_midi)

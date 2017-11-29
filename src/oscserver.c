@@ -136,6 +136,14 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
         lo_message oscm;
         uint8_t first = 1;
 
+        if( (midi[0]&0xF0) == 0x90 && midi[2] == 0x00)
+        {
+            //this is actually a noteon 0 which is the same as note-off
+            //convert it before we try to pair it;
+            midi[0] -= 0x10;
+            midi[2] = 64;
+        }
+
         for(i=0; i<data->npairs; i++)
         {
             PAIRHANDLE ph = data->p[i];
