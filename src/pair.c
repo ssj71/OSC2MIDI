@@ -1676,6 +1676,13 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
     // We may have to mutate the MIDI message below, so we actually work on
     // this copy in order to keep the original message unscathed. -ag
     uint8_t mymsg[3] = {msg[0],msg[1],msg[2]};
+    if( (mymsg[0]&0xF0) == 0x90 && mymsg[2] == 0x00)
+    {
+        //this is actually a noteon 0 which is the same as note-off
+        //convert it before we try to pair it;
+        mymsg[0] -= 0x10;
+        mymsg[2] = 64;
+    }
 
     if(!p->raw_midi)
     {
@@ -1687,11 +1694,6 @@ int try_match_midi(PAIRHANDLE ph, uint8_t msg[], uint8_t strict_match, uint8_t* 
                 //this is actually a note() command with a variable in the 4th
                 //argument, which matches a note on message
                 noteon = 1;
-            }
-            else if( p->opcode == 0x80 && (mymsg[0]&0xF0) == 0x90 && mymsg[2] == 0x00)
-            {
-                //this is actually a noteon 0 which is the same as note-off
-                mymsg[0] -= 0x10;
             }
             else
             {
