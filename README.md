@@ -1,7 +1,7 @@
 OSC2MIDI
 ========
 
-OSC2MIDI is a highly configurable OSC to jack MIDI (and back). It was designed especially for use on linux desktop 
+OSC2MIDI is a highly configurable OSC to jack MIDI (and back) bridge. It was designed especially for use on linux desktop 
 and the open source Android app
 called "Control (OSC+MIDI)" but was deliberately written to be flexible enough
 to be used with any OSC controller or target. It has not been tested on windows, but has been reported to work on OSX.
