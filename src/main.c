@@ -237,6 +237,7 @@ void usage()
     printf("    -o2m           only convert OSC messages to MIDI\n");
     printf("    -m2o           only convert MIDI messages to OSC\n");
     printf("    -n             dry run: check syntax of map file and exit\n");
+    printf("    -j <value>     set JACK client name\n");
     printf("    -h             show this message\n");
     printf("\n");
     printf("NOTES:\n");
@@ -264,7 +265,7 @@ static int missing_arg(const char *opt)
 
 int main(int argc, char** argv)
 {
-    char file[200], port[200], addr[200];
+    char file[200], port[200], addr[200], jackname[200];
     int i;
     lo_address loaddr;
     CONVERTER conv;
@@ -274,6 +275,7 @@ int main(int argc, char** argv)
     strcpy(file,"default.omm");
     strcpy(port,"57120");
     strcpy(addr,"osc.udp://localhost:8000");
+    strcpy(jackname,"osc2midi");
     conv.verbose = 0;
     conv.dry_run = 0;
     conv.errors = 0;
@@ -379,6 +381,12 @@ int main(int argc, char** argv)
                 seq.usefilter = 1;
                 seq.filter = &conv.filter;
             }
+            else if (strcmp(argv[i], "-j") == 0)
+            {
+                if (!argv[i+1]) return missing_arg(argv[i]);
+                // JACK client name
+                strcpy(jackname, argv[++i]);
+            }
             else if (strcmp(argv[i], "-v") == 0)
             {
                 conv.verbose = 1;
@@ -449,7 +457,7 @@ int main(int argc, char** argv)
     //start JACK client
     if(!conv.mon_mode)
     {
-        if(!init_jack(&seq,conv.verbose))
+        if(!init_jack(&seq,conv.verbose,jackname))
         {
             printf("JACK connection failed");
             return -1;

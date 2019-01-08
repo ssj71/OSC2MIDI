@@ -559,14 +559,14 @@ int pop_midi(void* seqq, uint8_t msg[])
 //this is run in the main thread
 ////////////////////////////////
 int
-init_jack(JACK_SEQ* seq, uint8_t verbose)
+init_jack(JACK_SEQ* seq, uint8_t verbose, const char* clientname)
 {
     int err;
 
     seq->nnotes = 0;
     seq->old_filter = 0;
     if(verbose)printf("opening client...\n");
-    seq->jack_client = jack_client_open("osc2midi", JackNullOption, NULL);
+    seq->jack_client = jack_client_open(clientname, JackNullOption, NULL);
 
     if (seq->jack_client == NULL)
     {
