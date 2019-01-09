@@ -24,7 +24,7 @@ typedef struct _jseq
     uint8_t nnotes;
 } JACK_SEQ;
 
-int init_jack(JACK_SEQ* seq, uint8_t verbose);
+int init_jack(JACK_SEQ* seq, uint8_t verbose, const char* clientname);
 void close_jack(JACK_SEQ* seq);
 void queue_midi(void* seqq, uint8_t msg[]);
 int pop_midi(void* seqq, uint8_t msg[]);
