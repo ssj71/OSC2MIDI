@@ -31,4 +31,9 @@ typedef struct _CONVERTER
 
     MIDI_SEQ seq;
 } CONVERTER;
+
+int load_map(CONVERTER* conv, char* file);
+int is_empty(const char *s);
+void init_registers(float ***regs, int n);
+int process_cli_args(int argc, char** argv, char* file, char* port, char* addr, char* clientname, CONVERTER* conv);
 #endif

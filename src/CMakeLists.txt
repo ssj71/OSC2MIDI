@@ -22,6 +22,7 @@ add_executable(osc2midi
   ht_stuff.c
   oscserver.c
   jackmidi.c
+  converter.c
   main.c
 )
 
