@@ -21,7 +21,7 @@ add_executable(osc2midi
   hashtable.c
   ht_stuff.c
   oscserver.c
-  jackdriver.c
+  jackmidi.c
   main.c
 )
 

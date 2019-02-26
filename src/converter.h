@@ -6,6 +6,8 @@
 #define CONVERTER_H
 #include<stdint.h>
 #include"pair.h"
+#include"midiseq.h"
+#include"hashtable.h"
 
 typedef struct _CONVERTER
 {
@@ -26,6 +28,6 @@ typedef struct _CONVERTER
     table tab;
     float** registers;
 
-    void * seq;
+    MIDI_SEQ seq;
 } CONVERTER;
 #endif

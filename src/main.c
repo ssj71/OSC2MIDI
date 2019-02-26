@@ -13,7 +13,7 @@
 #include"pair.h"
 #include"oscserver.h"
 #include"converter.h"
-#include"jackdriver.h"
+#include"midiseq.h"
 #include"ht_stuff.h"
 
 #ifndef PREFIX
@@ -269,7 +269,6 @@ int main(int argc, char** argv)
     int i;
     lo_address loaddr;
     CONVERTER conv;
-    JACK_SEQ seq;
 
     //defaults
     strcpy(file,"default.omm");
@@ -286,9 +285,9 @@ int main(int argc, char** argv)
     conv.glob_vel = 100;
     conv.filter = 0;
     conv.convert = 0;
-    seq.useout = 1;
-    seq.usein = 1;
-    seq.usefilter = 0;
+    conv.seq.useout = 1;
+    conv.seq.usein = 1;
+    conv.seq.usefilter = 0;
     if(argc>1)
     {
         for (i = 1; i<argc; i++)
@@ -378,13 +377,13 @@ int main(int argc, char** argv)
                 if (!argv[i+1]) return missing_arg(argv[i]);
                 // filter shift
                 conv.filter = atoi(argv[++i]);
-                seq.usefilter = 1;
-                seq.filter = &conv.filter;
+                conv.seq.usefilter = 1;
+                conv.seq.filter = &conv.filter;
             }
             else if (strcmp(argv[i], "-name") == 0)
             {
                 if (!argv[i+1]) return missing_arg(argv[i]);
-                // JACK client name
+                // midi client name
                 strcpy(clientname, argv[++i]);
             }
             else if (strcmp(argv[i], "-v") == 0)
@@ -423,8 +422,8 @@ int main(int argc, char** argv)
         }
         if( (i = check_pair_set_for_filter(conv.p,conv.npairs)) )
         {
-            seq.usefilter = 1;
-            seq.filter = &conv.filter;
+            conv.seq.usefilter = 1;
+            conv.seq.filter = &conv.filter;
             printf("Found pair %i with filter functions, creating midi filter in/out pair.\n", i);
         }
     }
@@ -436,33 +435,32 @@ int main(int argc, char** argv)
     if(conv.convert > -1)
     {
         st = start_osc_server(port,&conv);
-        seq.useout = 1;
+        conv.seq.useout = 1;
     }
     else
     {
-        seq.useout = 0;
+        conv.seq.useout = 0;
     }
     if(conv.convert < 1)
     {
         //get address ready to send osc messages to
-        seq.usein = 1;
+        conv.seq.usein = 1;
         loaddr = lo_address_new_from_url(addr);
         printf(" sending osc messages to address %s\n",addr);
     }
     else
     {
-        seq.usein = 0;
+        conv.seq.usein = 0;
     }
 
-    //start JACK client
+    //start midi client
     if(!conv.mon_mode)
     {
-        if(!init_jack(&seq,conv.verbose,clientname))
+        if(!init_midi_seq(&conv.seq,conv.verbose,clientname))
         {
-            printf("JACK connection failed");
+            printf("MIDI connection failed");
             return -1;
         }
-        conv.seq = (void*)&seq;
     }
 
     if(conv.verbose)
@@ -486,8 +484,8 @@ int main(int argc, char** argv)
     if(!conv.mon_mode)
     {
         if(conv.verbose)
-            printf(" closing jack ports\n");
-        close_jack(&seq);
+            printf(" closing midi ports\n");
+        close_midi_seq(&conv.seq);
     }
     if(conv.convert > -1)
     {

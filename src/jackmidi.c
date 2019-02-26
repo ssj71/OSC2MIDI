@@ -37,7 +37,7 @@
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <jack/ringbuffer.h>
-#include "jackdriver.h"
+#include "midiseq.h"
 
 
 typedef struct _MidiMessage
@@ -55,6 +55,16 @@ typedef struct _MidiMessage
 /* Will emit a warning if execution of jack callback takes longer than this. */
 #define MAX_PROCESSING_TIME	0.01
 
+typedef struct _jackseq
+{
+    jack_ringbuffer_t *ringbuffer_out;
+    jack_ringbuffer_t *ringbuffer_in;
+    jack_client_t	*jack_client;
+    jack_port_t	*output_port;
+    jack_port_t	*input_port;
+    jack_port_t	*filter_in_port;
+    jack_port_t	*filter_out_port;
+}JACK_SEQ;
 
 ///////////////////////////////////////////////
 //These functions operate in the JACK RT Thread
@@ -185,11 +195,12 @@ process_midi_input(JACK_SEQ* seq,jack_nframes_t nframes)
 }
 
 void
-process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
+process_midi_filter(MIDI_SEQ* mseq,jack_nframes_t nframes)
 {
+    JACK_SEQ* seq = (JACK_SEQ*)mseq->driver;
     int read, events, i, j;
     uint8_t* buffer;
-    int8_t filter = *seq->filter;
+    int8_t filter = *mseq->filter;
     void *inport_buffer;
     void *outport_buffer;
     jack_midi_event_t event;
@@ -214,19 +225,19 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
 #endif
 
     //check if filter shift amount has changed
-    if(filter != seq->old_filter)
+    if(filter != mseq->old_filter)
     {
         uint8_t data[3];
         event.buffer = data;
         event.size = 3;
         //turn off all currently on notes and send new note-ons
-        for(j=0; j<seq->nnotes; j++)
+        for(j=0; j<mseq->nnotes; j++)
         {
-            int note = seq->note[j]+seq->old_filter;
+            int note = mseq->note[j]+mseq->old_filter;
             if (note < 0 || note > 127)
                 // note out of range, skip
                 continue;
-            event.buffer[0] = seq->notechan[j]&0xEF;//note on to note off
+            event.buffer[0] = mseq->notechan[j]&0xEF;//note on to note off
             event.buffer[1] = note;
             event.buffer[2] = 0;
 #ifdef JACK_MIDI_NEEDS_NFRAMES
@@ -243,15 +254,15 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
 
             memcpy(buffer, event.buffer, 3);
         }
-        for(j=0; j<seq->nnotes; j++)
+        for(j=0; j<mseq->nnotes; j++)
         {
-            int note = seq->note[j]+filter;
+            int note = mseq->note[j]+filter;
             if (note < 0 || note > 127)
                 // note out of range, skip
                 continue;
-            event.buffer[0] = seq->notechan[j];//note on
+            event.buffer[0] = mseq->notechan[j];//note on
             event.buffer[1] = note;
-            event.buffer[2] = seq->notevel[j];
+            event.buffer[2] = mseq->notevel[j];
 #ifdef JACK_MIDI_NEEDS_NFRAMES
             buffer = jack_midi_event_reserve(outport_buffer, 0, 3, nframes);
 #else
@@ -266,7 +277,7 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
 
             memcpy(buffer, event.buffer, 3);
         }
-        seq->old_filter = filter;
+        mseq->old_filter = filter;
     }
 
 #ifdef JACK_MIDI_NEEDS_NFRAMES
@@ -296,26 +307,26 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                 if((event.buffer[0]&0xF0) == 0x80 ||
                         ((event.buffer[0]&0xF0) == 0x90 && event.buffer[2] == 0))
                 {
-                    uint8_t on = seq->note[0];
+                    uint8_t on = mseq->note[0];
                     //note off event
                     //remove it from list
-                    for(j=0; j<seq->nnotes; j++)
+                    for(j=0; j<mseq->nnotes; j++)
                     {
                         //find it and shift everything above it down 1
                         if(j && on == event.buffer[1])
                         {
-                            seq->note[j-1] = seq->note[j];
-                            seq->notechan[j-1] = seq->notechan[j];
-                            seq->notevel[j-1] = seq->notevel[j];
+                            mseq->note[j-1] = mseq->note[j];
+                            mseq->notechan[j-1] = mseq->notechan[j];
+                            mseq->notevel[j-1] = mseq->notevel[j];
                         }
                         else if(j)
                         {
-                            on = seq->note[j];
+                            on = mseq->note[j];
                         }
                     }
                     if(on == event.buffer[1])
                     {
-                        seq->nnotes--;
+                        mseq->nnotes--;
                     }
                     int note = event.buffer[1]+filter;
                     if (note < 0 || note > 127)
@@ -326,20 +337,20 @@ process_midi_filter(JACK_SEQ* seq,jack_nframes_t nframes)
                 else if((event.buffer[0]&0xF0) == 0x90)
                 {
                     //note on event
-                    for(j=0; j<seq->nnotes; j++)
+                    for(j=0; j<mseq->nnotes; j++)
                     {
                         //check if it's already on the list
-                        if(seq->note[j] == event.buffer[1])
+                        if(mseq->note[j] == event.buffer[1])
                         {
                             break;
                         }
                     }
-                    if(j == seq->nnotes)
+                    if(j == mseq->nnotes)
                     {
                         //add note to queue
-                        seq->notechan[seq->nnotes] = event.buffer[0];
-                        seq->note[seq->nnotes] = event.buffer[1];
-                        seq->notevel[seq->nnotes++] = event.buffer[2];
+                        mseq->notechan[mseq->nnotes] = event.buffer[0];
+                        mseq->note[mseq->nnotes] = event.buffer[1];
+                        mseq->notevel[mseq->nnotes++] = event.buffer[2];
                     }
                     int note = event.buffer[1]+filter;
                     if (note < 0 || note > 127)
@@ -447,17 +458,18 @@ process_midi_output(JACK_SEQ* seq,jack_nframes_t nframes)
 int
 process_callback(jack_nframes_t nframes, void *seqq)
 {
-    JACK_SEQ* seq = (JACK_SEQ*)seqq;
+    MIDI_SEQ* mseq = (MIDI_SEQ*)seqq;
+    JACK_SEQ* seq = (JACK_SEQ*)mseq->driver;
 #ifdef MEASURE_TIME
     if (get_delta_time() > MAX_TIME_BETWEEN_CALLBACKS)
         printf("Had to wait too long for JACK callback; scheduling problem?");
 #endif
 
-    if(seq->usein)
+    if(mseq->usein)
         process_midi_input( seq,nframes );
-    if(seq->usefilter)
-        process_midi_filter( seq,nframes );
-    if(seq->useout)
+    if(mseq->usefilter)
+        process_midi_filter( mseq,nframes );
+    if(mseq->useout)
         process_midi_output( seq,nframes );
 
 #ifdef MEASURE_TIME
@@ -471,10 +483,10 @@ process_callback(jack_nframes_t nframes, void *seqq)
 ///////////////////////////////////////////////
 //these functions are executed in other threads
 ///////////////////////////////////////////////
-void queue_midi(void* seqq, uint8_t msg[])
+void queue_midi(MIDI_SEQ* seqq, uint8_t msg[])
 {
     MidiMessage ev;
-    JACK_SEQ* seq = (JACK_SEQ*)seqq;
+    JACK_SEQ* seq = (JACK_SEQ*)seqq->driver;
     ev.len = 3;
 
     // At least with JackOSX, Jack will transmit the bytes verbatim, so make
@@ -528,11 +540,11 @@ void queue_midi(void* seqq, uint8_t msg[])
     queue_message(seq->ringbuffer_out,&ev);
 }
 
-int pop_midi(void* seqq, uint8_t msg[])
+int pop_midi(MIDI_SEQ* seqq, uint8_t msg[])
 {
     int read;
     MidiMessage ev;
-    JACK_SEQ* seq = (JACK_SEQ*)seqq;
+    JACK_SEQ* seq = (JACK_SEQ*)seqq->driver;
 
     if (jack_ringbuffer_read_space(seq->ringbuffer_in))
     {
@@ -559,30 +571,35 @@ int pop_midi(void* seqq, uint8_t msg[])
 //this is run in the main thread
 ////////////////////////////////
 int
-init_jack(JACK_SEQ* seq, uint8_t verbose, const char* clientname)
+init_midi_seq(MIDI_SEQ* mseq, uint8_t verbose, const char* clientname)
 {
     int err;
+    JACK_SEQ* seq;
 
-    seq->nnotes = 0;
-    seq->old_filter = 0;
+    mseq->nnotes = 0;
+    mseq->old_filter = 0;
+    seq = (JACK_SEQ*)malloc(sizeof(JACK_SEQ));
+    mseq->driver = seq;
     if(verbose)printf("opening client...\n");
     seq->jack_client = jack_client_open(clientname, JackNullOption, NULL);
 
     if (seq->jack_client == NULL)
     {
         printf("Could not connect to the JACK server; run jackd first?\n");
+        free(seq);
         return 0;
     }
 
     if(verbose)printf("assigning process callback...\n");
-    err = jack_set_process_callback(seq->jack_client, process_callback, (void*)seq);
+    err = jack_set_process_callback(seq->jack_client, process_callback, (void*)mseq);
     if (err)
     {
         printf("Could not register JACK process callback.\n");
+        free(seq);
         return 0;
     }
 
-    if(seq->usein)
+    if(mseq->usein)
     {
 
         if(verbose)printf("initializing JACK input: \ncreating ringbuffer...\n");
@@ -591,6 +608,7 @@ init_jack(JACK_SEQ* seq, uint8_t verbose, const char* clientname)
         if (seq->ringbuffer_in == NULL)
         {
             printf("Cannot create JACK ringbuffer.\n");
+            free(seq);
             return 0;
         }
 
@@ -602,10 +620,11 @@ init_jack(JACK_SEQ* seq, uint8_t verbose, const char* clientname)
         if (seq->input_port == NULL)
         {
             printf("Could not register JACK port.\n");
+            free(seq);
             return 0;
         }
     }
-    if(seq->useout)
+    if(mseq->useout)
     {
 
         if(verbose)printf("initializing JACK output: \ncreating ringbuffer...\n");
@@ -614,6 +633,7 @@ init_jack(JACK_SEQ* seq, uint8_t verbose, const char* clientname)
         if (seq->ringbuffer_out == NULL)
         {
             printf("Cannot create JACK ringbuffer.\n");
+            free(seq);
             return 0;
         }
 
@@ -625,10 +645,11 @@ init_jack(JACK_SEQ* seq, uint8_t verbose, const char* clientname)
         if (seq->output_port == NULL)
         {
             printf("Could not register JACK port.\n");
+            free(seq);
             return 0;
         }
     }
-    if(seq->usefilter)
+    if(mseq->usefilter)
     {
         if(verbose)printf("initializing JACK midi filter in/out pair...\n");
         seq->filter_in_port = jack_port_register(seq->jack_client, "filter_in", JACK_DEFAULT_MIDI_TYPE,
@@ -639,6 +660,7 @@ init_jack(JACK_SEQ* seq, uint8_t verbose, const char* clientname)
         if (seq->filter_in_port == NULL || seq->filter_out_port == NULL)
         {
             printf("Could not register JACK port.\n");
+            free(seq);
             return 0;
         }
     }
@@ -646,13 +668,16 @@ init_jack(JACK_SEQ* seq, uint8_t verbose, const char* clientname)
     if (jack_activate(seq->jack_client))
     {
         printf("Cannot activate JACK client.\n");
+        free(seq);
         return 0;
     }
     return 1;
 }
 
-void close_jack(JACK_SEQ* seq)
+void close_midi_seq(MIDI_SEQ* mseq)
 {
-    if(seq->useout)jack_ringbuffer_free(seq->ringbuffer_out);
-    if(seq->usein)jack_ringbuffer_free(seq->ringbuffer_in);
+    JACK_SEQ* seq = (JACK_SEQ*)mseq->driver;
+    if(mseq->useout)jack_ringbuffer_free(seq->ringbuffer_out);
+    if(mseq->usein)jack_ringbuffer_free(seq->ringbuffer_in);
+    free(seq);
 }

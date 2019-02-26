@@ -9,7 +9,7 @@
 #include "pair.h"
 #include "oscserver.h"
 #include "converter.h"
-#include "jackdriver.h"
+#include "midiseq.h"
 
 int done = 0;
 
@@ -116,7 +116,7 @@ int msg_handler(const char *path, const char *types, lo_arg ** argv,
 
             //push message onto ringbuffer (with timestamp)
             if(n>0)
-                queue_midi(conv->seq,midi);
+                queue_midi(&conv->seq,midi);
         }
     }
     if(conv->verbose && !first)
@@ -130,7 +130,7 @@ void convert_midi_in(lo_address addr, CONVERTER* data)
     int i,n;
     uint8_t midi[3];
 
-    while(pop_midi(data->seq,midi))
+    while(pop_midi(&data->seq,midi))
     {
         char path[200];
         lo_message oscm;
