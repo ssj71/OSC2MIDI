@@ -5,6 +5,7 @@
 #ifndef CONVERTER_H
 #define CONVERTER_H
 #include<stdint.h>
+#include<stdbool.h>
 #include"pair.h"
 #include"midiseq.h"
 #include"hashtable.h"
@@ -14,12 +15,12 @@ typedef struct _CONVERTER
     uint8_t glob_chan;
     uint8_t glob_vel;
     int8_t  filter;
-    uint8_t verbose;
-    uint8_t mon_mode;
-    uint8_t multi_match;
-    uint8_t strict_match;
+    bool verbose;
+    bool mon_mode;
+    bool multi_match;
+    bool strict_match;
     int8_t  convert; //0 = both, 1 = o2m, -1 = m2o
-    uint8_t dry_run;
+    bool dry_run;
     int errors;
 
     uint16_t npairs;

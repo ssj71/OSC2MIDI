@@ -1,14 +1,15 @@
 #ifndef MIDI_SEQ_H
 #define MIDI_SEQ_H
 #include<stdint.h>
+#include<stdbool.h>
 
 //general midi sequencer data
 typedef struct _mseq
 {
     void* driver;
-    uint8_t usein;
-    uint8_t useout;
-    uint8_t usefilter;
+    bool usein;
+    bool useout;
+    bool usefilter;
     int8_t* filter;
     int8_t old_filter;
     //keep track of on notes to jump octaves mid note

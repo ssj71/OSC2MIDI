@@ -275,19 +275,19 @@ int main(int argc, char** argv)
     strcpy(port,"57120");
     strcpy(addr,"osc.udp://localhost:8000");
     strcpy(clientname,"osc2midi");
-    conv.verbose = 0;
-    conv.dry_run = 0;
+    conv.verbose = false;
+    conv.dry_run = false;
     conv.errors = 0;
-    conv.mon_mode = 0;
-    conv.multi_match = 1;
-    conv.strict_match = 0;
+    conv.mon_mode = false;
+    conv.multi_match = true;
+    conv.strict_match = false;
     conv.glob_chan = 0;
     conv.glob_vel = 100;
     conv.filter = 0;
     conv.convert = 0;
-    conv.seq.useout = 1;
-    conv.seq.usein = 1;
-    conv.seq.usefilter = 0;
+    conv.seq.useout = true;
+    conv.seq.usein = true;
+    conv.seq.usefilter = false;
     if(argc>1)
     {
         for (i = 1; i<argc; i++)
@@ -295,17 +295,17 @@ int main(int argc, char** argv)
             if(strcmp(argv[i], "-single") ==0)
             {
                 //single matches
-                conv.multi_match = 0;
+                conv.multi_match = false;
             }
             else if(strcmp(argv[i], "-multi") ==0)
             {
                 //multiple matches
-                conv.multi_match = 1;
+                conv.multi_match = true;
             }
             else if(strcmp(argv[i], "-strict") ==0)
             {
                 //strict matches
-                conv.strict_match = 1;
+                conv.strict_match = false;
             }
             else if (strcmp(argv[i], "-map") == 0)
             {
@@ -316,7 +316,7 @@ int main(int argc, char** argv)
             else if(strcmp(argv[i], "-mon") ==0)
             {
                 //monitor mode (osc messages)
-                conv.mon_mode = 1;
+                conv.mon_mode = true;
                 conv.convert = 1;
             }
             else if(strcmp(argv[i], "-m2o") ==0)
@@ -338,7 +338,7 @@ int main(int argc, char** argv)
             else if (strcmp(argv[i], "-n") == 0)
             {
                 //dry run (only check syntax and exit with error code)
-                conv.dry_run = 1;
+                conv.dry_run = true;
             }
             else if(strcmp(argv[i], "-p") ==0)
             {
@@ -377,7 +377,7 @@ int main(int argc, char** argv)
                 if (!argv[i+1]) return missing_arg(argv[i]);
                 // filter shift
                 conv.filter = atoi(argv[++i]);
-                conv.seq.usefilter = 1;
+                conv.seq.usefilter = true;
                 conv.seq.filter = &conv.filter;
             }
             else if (strcmp(argv[i], "-name") == 0)
@@ -388,7 +388,7 @@ int main(int argc, char** argv)
             }
             else if (strcmp(argv[i], "-v") == 0)
             {
-                conv.verbose = 1;
+                conv.verbose = true;
             }
             else if (strcmp(argv[i], "-h") == 0)
             {
@@ -422,7 +422,7 @@ int main(int argc, char** argv)
         }
         if( (i = check_pair_set_for_filter(conv.p,conv.npairs)) )
         {
-            conv.seq.usefilter = 1;
+            conv.seq.usefilter = true;
             conv.seq.filter = &conv.filter;
             printf("Found pair %i with filter functions, creating midi filter in/out pair.\n", i);
         }
@@ -435,22 +435,22 @@ int main(int argc, char** argv)
     if(conv.convert > -1)
     {
         st = start_osc_server(port,&conv);
-        conv.seq.useout = 1;
+        conv.seq.useout = true;
     }
     else
     {
-        conv.seq.useout = 0;
+        conv.seq.useout = false;
     }
     if(conv.convert < 1)
     {
         //get address ready to send osc messages to
-        conv.seq.usein = 1;
+        conv.seq.usein = true;
         loaddr = lo_address_new_from_url(addr);
         printf(" sending osc messages to address %s\n",addr);
     }
     else
     {
-        conv.seq.usein = 0;
+        conv.seq.usein = false;
     }
 
     //start midi client
