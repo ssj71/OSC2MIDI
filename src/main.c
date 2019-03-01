@@ -74,6 +74,7 @@ int main(int argc, char** argv)
     char file[200], port[200], addr[200], clientname[200];
     int i;
     lo_address loaddr;
+    lo_server_thread st;
     CONVERTER conv;
 
     if(process_cli_args(argc,argv,file,port,addr,clientname,&conv))
@@ -106,7 +107,6 @@ int main(int argc, char** argv)
         printf("Monitor mode, incoming OSC messages will only be printed.\n");
 
     //start the server
-    lo_server_thread st;
     if(conv.convert > -1)
     {
         st = start_osc_server(port,&conv);

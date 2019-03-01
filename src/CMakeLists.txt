@@ -34,3 +34,14 @@ install(TARGETS osc2midi
   DESTINATION bin
 )
 
+add_library(osc2midi_internal SHARED
+  pair.c
+  hashtable.c
+  ht_stuff.c
+  oscserver.c
+  jackmidi.c
+  converter.c
+  jackinternal.c
+)
+
+target_link_libraries(osc2midi_internal ${LO_LIBRARIES} ${JACK_LIBRARIES} m)
