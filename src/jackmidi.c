@@ -34,9 +34,7 @@
 #include <string.h>
 #include <sysexits.h>
 #include <errno.h>
-#include <jack/jack.h>
-#include <jack/midiport.h>
-#include <jack/ringbuffer.h>
+#include"jackprvt.h"
 #include "midiseq.h"
 
 
@@ -54,17 +52,6 @@ typedef struct _MidiMessage
 
 /* Will emit a warning if execution of jack callback takes longer than this. */
 #define MAX_PROCESSING_TIME	0.01
-
-typedef struct _jackseq
-{
-    jack_ringbuffer_t *ringbuffer_out;
-    jack_ringbuffer_t *ringbuffer_in;
-    jack_client_t	*jack_client;
-    jack_port_t	*output_port;
-    jack_port_t	*input_port;
-    jack_port_t	*filter_in_port;
-    jack_port_t	*filter_out_port;
-}JACK_SEQ;
 
 ///////////////////////////////////////////////
 //These functions operate in the JACK RT Thread
@@ -571,33 +558,10 @@ int pop_midi(MIDI_SEQ* seqq, uint8_t msg[])
 //this is run in the main thread
 ////////////////////////////////
 int
-init_midi_seq(MIDI_SEQ* mseq, uint8_t verbose, const char* clientname)
+init_ports(MIDI_SEQ* mseq, bool verbose)
 {
-    int err;
     JACK_SEQ* seq;
-
-    mseq->nnotes = 0;
-    mseq->old_filter = 0;
-    seq = (JACK_SEQ*)malloc(sizeof(JACK_SEQ));
-    mseq->driver = seq;
-    if(verbose)printf("opening client...\n");
-    seq->jack_client = jack_client_open(clientname, JackNullOption, NULL);
-
-    if (seq->jack_client == NULL)
-    {
-        printf("Could not connect to the JACK server; run jackd first?\n");
-        free(seq);
-        return 0;
-    }
-
-    if(verbose)printf("assigning process callback...\n");
-    err = jack_set_process_callback(seq->jack_client, process_callback, (void*)mseq);
-    if (err)
-    {
-        printf("Could not register JACK process callback.\n");
-        free(seq);
-        return 0;
-    }
+    seq = mseq->driver;
 
     if(mseq->usein)
     {
@@ -668,6 +632,45 @@ init_midi_seq(MIDI_SEQ* mseq, uint8_t verbose, const char* clientname)
     if (jack_activate(seq->jack_client))
     {
         printf("Cannot activate JACK client.\n");
+        free(seq);
+        return 0;
+    }
+    return 1;
+}
+
+int
+init_midi_seq(MIDI_SEQ* mseq, bool verbose, const char* clientname)
+{
+    int err;
+    JACK_SEQ* seq;
+
+    mseq->nnotes = 0;
+    mseq->old_filter = 0;
+    seq = (JACK_SEQ*)malloc(sizeof(JACK_SEQ));
+    mseq->driver = seq;
+    if(verbose)printf("opening client...\n");
+    //TODO: just need to replace this first block then can re-use the rest
+    //TODO: make prvjackmidi.h
+    seq->jack_client = jack_client_open(clientname, JackNullOption, NULL);
+
+    if (seq->jack_client == NULL)
+    {
+        printf("Could not connect to the JACK server; run jackd first?\n");
+        free(seq);
+        return 0;
+    }
+
+    if(verbose)printf("assigning process callback...\n");
+    err = jack_set_process_callback(seq->jack_client, process_callback, (void*)mseq);
+    if (err)
+    {
+        printf("Could not register JACK process callback.\n");
+        free(seq);
+        return 0;
+    }
+
+    if(!init_ports(mseq,verbose))
+    {
         free(seq);
         return 0;
     }

@@ -19,7 +19,7 @@ typedef struct _mseq
     uint8_t nnotes;
 } MIDI_SEQ;
 
-int init_midi_seq(MIDI_SEQ* seq, uint8_t verbose, const char* clientname);
+int init_midi_seq(MIDI_SEQ* seq, bool verbose, const char* clientname);
 void close_midi_seq(MIDI_SEQ* seq);
 void queue_midi(MIDI_SEQ* seqq, uint8_t msg[]);
 int pop_midi(MIDI_SEQ* seqq, uint8_t msg[]);
