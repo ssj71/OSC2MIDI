@@ -16,14 +16,14 @@
 /magneticfield fff, x,y,z : controlchange( channel, 6, 2*z+64);
 #gyroscope
 /gyroscope fff, x,y,z : controlchange( channel, 7, 6*x);
-/gyroscope fff, x,y,z : controlchange( channel, 8, 6*7);
+/gyroscope fff, x,y,z : controlchange( channel, 8, 6*y);
 /gyroscope fff, x,y,z : controlchange( channel, 9, 6*z);
 #light
 /light f, a : controlchange( channel, 10, a/10);
 #gravity
-/gravity fff, x,y,z : controlchange( channel, 11, 10*x);
-/gravity fff, x,y,z : controlchange( channel, 11, 10*y);
-/gravity fff, x,y,z : controlchange( channel, 11, 10*z);
+/gravity fff, x,y,z : controlchange( channel, 1, 10*x);
+/gravity fff, x,y,z : controlchange( channel, 2, 10*y);
+/gravity fff, x,y,z : controlchange( channel, 3, 10*z);
 #linear acceleration
 /linearacceleration fff, a,b,c : controlchange( channel, 1, 64*a+64);
 /linearacceleration fff, a,b,c : controlchange( channel, 2, 64*b+64);
