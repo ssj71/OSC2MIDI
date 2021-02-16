@@ -1,0 +1,72 @@
+#mapping for app sensors2osc on fdroid
+#https://f-droid.org/en/packages/org.sensors2.osc/
+#likely every phone will have some variations in the availability
+#and sometimes scale of the sensors and data
+
+#multitouch
+/touch{i} ff, a,b,c : controlchange( channel, 2*a-1, 127*b);
+/touch{i} ff, a,b,c : controlchange( channel, 2*a, 127*c);
+#accelerometer
+/accelerometer fff, x,y,z : controlchange( channel, 1, 10*x);
+/accelerometer fff, x,y,z : controlchange( channel, 2, 10*y);
+/accelerometer fff, x,y,z : controlchange( channel, 3, 10*z);
+#magnetic field
+/magneticfield fff, x,y,z : controlchange( channel, 4, 2*x+64);
+/magneticfield fff, x,y,z : controlchange( channel, 5, 2*y+64);
+/magneticfield fff, x,y,z : controlchange( channel, 6, 2*z+64);
+#gyroscope
+/gyroscope fff, x,y,z : controlchange( channel, 7, 6*x);
+/gyroscope fff, x,y,z : controlchange( channel, 8, 6*7);
+/gyroscope fff, x,y,z : controlchange( channel, 9, 6*z);
+#light
+/light f, a : controlchange( channel, 10, a/10);
+#gravity
+/gravity fff, x,y,z : controlchange( channel, 11, 10*x);
+/gravity fff, x,y,z : controlchange( channel, 11, 10*y);
+/gravity fff, x,y,z : controlchange( channel, 11, 10*z);
+#linear acceleration
+/linearacceleration fff, a,b,c : controlchange( channel, 1, 64*a+64);
+/linearacceleration fff, a,b,c : controlchange( channel, 2, 64*b+64);
+/linearacceleration fff, a,b,c : controlchange( channel, 3, 64*c+64);
+#rotation vector
+/rotationvector fffff, a,b,c,d,e : controlchange( channel, 1, 64*a+64);
+/rotationvector fffff, a,b,c,d,e : controlchange( channel, 2, 64*b+64);
+/rotationvector fffff, a,b,c,d,e : controlchange( channel, 3, 64*c+64);
+/rotationvector fffff, a,b,c,d,e : controlchange( channel, 4, 127*d);
+/rotationvector fffff, a,b,c,d,e : controlchange( channel, 5, 127*e);
+#since steps aren't really bounded, these will just saturate after 127 steps
+/stepcounter f, a: controlchange( channel, 1, a);
+/stepdetector f, a: controlchange( channel, 1, a);
+#game rotation vector
+/gamerotationvector ffff, a,b,c,d : controlchange( channel, 1, 64*a+64);
+/gamerotationvector ffff, a,b,c,d : controlchange( channel, 2, 64*b+64);
+/gamerotationvector ffff, a,b,c,d : controlchange( channel, 3, 127*c);
+/gamerotationvector ffff, a,b,c,d : controlchange( channel, 4, 127*d);
+#geomagnetic rotation vector
+/georotationvector fffff, a,b,c,d,e : controlchange( channel, 1, 64*a+64);
+/georotationvector fffff, a,b,c,d,e : controlchange( channel, 2, 64*b+64);
+/georotationvector fffff, a,b,c,d,e : controlchange( channel, 3, 64*c+64);
+/georotationvector fffff, a,b,c,d,e : controlchange( channel, 4, 127*d);
+/georotationvector fffff, a,b,c,d,e : controlchange( channel, 5, 127*e);
+#orientation
+/orientation fff, a,b,c : controlchange( channel, 1, 25*a+64);
+/orientation fff, a,b,c : controlchange( channel, 2, 25*b+64);
+/orientation fff, a,b,c : controlchange( channel, 3, 25*c+64);
+#inclination
+/inclination f, a : controlchange( channel, 1, 32*a+64);
+
+#unimplemented sensors
+#uncalibrated values are a bit different on each phone so I wasn't sure
+#how to scale them
+#/magneticfielduncalibrated ffffff,
+#/gyroscopeuncalibrated ffffff,
+#my phone didn't produce any messages from these sensors
+#/significantmotion 
+#/tiltdetector
+
+
+
+
+
+
+

@@ -58,6 +58,9 @@ Android app. Other included mappings are:
   interface that comes default with Control. It is a bit more musical than the
   default mapping.
 
+* sensors2osc - made to work with many of the sensors in the app of the same
+  name available on the fdroid app store.
+
 Mappings are in plain text and are completely human readable. If you wish to
 make your own map file or tweak the existing ones there is extensive
 documentation in [syntax.md](syntax.md) and also the default map file installed to 
