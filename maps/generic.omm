@@ -6,6 +6,7 @@
 
 
 /midi/cc{i} f, ctl, val   : controlchange( channel, ctl, val );
+/midi/cc{i} i, ctl, val   : controlchange( channel, ctl, val );
 /midi/pc f, pgm           : programchange( channel, pgm );  
 /midi/pitch f, bend       : pitchbend( channel, bend );
 /midi/noteon{i} i, n,vel  : noteon( channel, n, vel );
