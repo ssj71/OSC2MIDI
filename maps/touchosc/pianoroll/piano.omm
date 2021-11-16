@@ -1,0 +1,8 @@
+# Piano.touchosc for 720 x 1280
+
+/1/n{i} f, n,state	: note( channel, n, 100, state );
+/1/cc{i} f, cc,val	: controlchange( channel, cc, 127*val );
+/2/push{i} f, n,state	: note( channel, n, 100, state );
+/2/cc{i} f, cc,val	: controlchange( channel, cc, 127*val );
+
+#run:  osc2midi -p 3819 -c 0 -o2m -m touchosc/pianoroll/Piano where Piano is located under /usr/share/osc2midi/touchosc/pianoroll/Piano.omm
