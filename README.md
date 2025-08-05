@@ -29,8 +29,9 @@ For modern Mac Apple Silicon systems, use Homebrew to install dependencies:
 
     brew install cmake liblo jack
 
-The project builds natively on Apple Silicon. Note: Due to liblo API changes, 
-this version includes compatibility fixes for newer liblo versions (0.32+).
+The project builds natively on Apple Silicon. This version includes backwards-compatible 
+support for both older and newer liblo versions. The build system automatically detects
+your liblo version and uses the appropriate API (handles liblo 0.32+ breaking changes).
 
 Then follow the standard build process:
 

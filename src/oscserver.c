@@ -15,10 +15,20 @@ int done = 0;
 
 void error(int num, const char *m, const char *path);
 
+// Handler function declarations - compatible with both old and new liblo API
+#ifdef LIBLO_NEW_API
+// New API (liblo >= 0.32): lo_message parameter
 int mon_handler(const char *path, const char *types, lo_arg ** argv,
                 int argc, lo_message data, void *user_data);
 int msg_handler(const char *path, const char *types, lo_arg ** argv,
                 int argc, lo_message data, void *user_data);
+#else
+// Old API (liblo < 0.32): void* parameter  
+int mon_handler(const char *path, const char *types, lo_arg ** argv,
+                int argc, void *data, void *user_data);
+int msg_handler(const char *path, const char *types, lo_arg ** argv,
+                int argc, void *data, void *user_data);
+#endif
 
 
 lo_server_thread start_osc_server(char* port, CONVERTER* data)
@@ -53,8 +63,13 @@ void error(int num, const char *msg, const char *path)
 
 /* catch any incoming messages and display them. returning 1 means that the
  * message has not been fully handled and the server should try other methods */
+#ifdef LIBLO_NEW_API
 int mon_handler(const char *path, const char *types, lo_arg ** argv,
                 int argc, lo_message data, void *user_data)
+#else
+int mon_handler(const char *path, const char *types, lo_arg ** argv,
+                int argc, void *data, void *user_data)
+#endif
 {
     int i;
 
@@ -75,8 +90,13 @@ int mon_handler(const char *path, const char *types, lo_arg ** argv,
 }
 
 //this handles the osc to midi conversions
+#ifdef LIBLO_NEW_API
 int msg_handler(const char *path, const char *types, lo_arg ** argv,
                 int argc, lo_message data, void *user_data)
+#else
+int msg_handler(const char *path, const char *types, lo_arg ** argv,
+                int argc, void *data, void *user_data)
+#endif
 {
     int i,j,n;
     uint8_t first = 1;
