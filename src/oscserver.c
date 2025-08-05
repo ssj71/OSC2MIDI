@@ -16,9 +16,9 @@ int done = 0;
 void error(int num, const char *m, const char *path);
 
 int mon_handler(const char *path, const char *types, lo_arg ** argv,
-                int argc, void *data, void *user_data);
+                int argc, lo_message data, void *user_data);
 int msg_handler(const char *path, const char *types, lo_arg ** argv,
-                int argc, void *data, void *user_data);
+                int argc, lo_message data, void *user_data);
 
 
 lo_server_thread start_osc_server(char* port, CONVERTER* data)
@@ -54,7 +54,7 @@ void error(int num, const char *msg, const char *path)
 /* catch any incoming messages and display them. returning 1 means that the
  * message has not been fully handled and the server should try other methods */
 int mon_handler(const char *path, const char *types, lo_arg ** argv,
-                int argc, void *data, void *user_data)
+                int argc, lo_message data, void *user_data)
 {
     int i;
 
@@ -76,7 +76,7 @@ int mon_handler(const char *path, const char *types, lo_arg ** argv,
 
 //this handles the osc to midi conversions
 int msg_handler(const char *path, const char *types, lo_arg ** argv,
-                int argc, void *data, void *user_data)
+                int argc, lo_message data, void *user_data)
 {
     int i,j,n;
     uint8_t first = 1;
