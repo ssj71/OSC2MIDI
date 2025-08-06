@@ -23,6 +23,24 @@ cmake, liblo and jack. To get these on ubuntu just run
 
     sudo apt-get install cmake liblo-dev libjack-dev
 
+## Building on macOS Apple Silicon (M1/M2/M3/M4)
+
+For modern Mac Apple Silicon systems, use Homebrew to install dependencies:
+
+    brew install cmake liblo jack
+
+The project builds natively on Apple Silicon. This version includes backwards-compatible 
+support for both older and newer liblo versions. The build system automatically detects
+your liblo version and uses the appropriate API (handles liblo 0.32+ breaking changes).
+
+Then follow the standard build process:
+
+    mkdir build
+    cd build
+    cmake ..
+    make
+    sudo make install
+
 Once installed you can simply run OSC2MIDI with the command
 
     osc2midi
